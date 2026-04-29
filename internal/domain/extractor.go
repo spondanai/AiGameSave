@@ -5,8 +5,9 @@ import "time"
 // SessionState represents the state extracted from a project for saving.
 type SessionState struct {
 	RecentTurns []Turn
+	ActiveFiles []string       `yaml:"activefiles,omitempty"`
 	GitVision   []FileMetadata
-	Diff        string `yaml:",omitempty"` // Truncated git diff for context
+	Diff        string         `yaml:",omitempty"`
 }
 
 // Turn represents a single interaction in the history.

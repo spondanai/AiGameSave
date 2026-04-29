@@ -1,9 +1,44 @@
 package domain
 
 import (
+	"regexp"
 	"sort"
 	"strings"
 )
+
+// filePathRe matches relative file paths that contain at least one "/" directory
+// separator and end with a file extension. Requires the path to start with a
+// letter so that version strings like "1.2.3/..." are not captured.
+var filePathRe = regexp.MustCompile(`[a-zA-Z][a-zA-Z0-9_.%-]*/[a-zA-Z0-9_.%-][a-zA-Z0-9_./%-]*\.[a-zA-Z][a-zA-Z0-9]{0,11}`)
+
+// ExtractFilePaths scans conversation turns for file path patterns and returns
+// a deduplicated, ordered list. The caller is responsible for filtering paths
+// that do not exist on disk.
+func ExtractFilePaths(turns []Turn) []string {
+	seen := make(map[string]struct{})
+	var result []string
+
+	for _, turn := range turns {
+		for _, raw := range filePathRe.FindAllString(turn.Content, -1) {
+			// Skip URL-like matches (e.g. github.com/foo/bar.go)
+			if strings.Contains(raw, "://") || looksLikeDomain(raw) {
+				continue
+			}
+			if _, ok := seen[raw]; !ok {
+				seen[raw] = struct{}{}
+				result = append(result, raw)
+			}
+		}
+	}
+	return result
+}
+
+// looksLikeDomain returns true when the first path component contains a dot,
+// which indicates a hostname like "github.com" rather than a local directory.
+func looksLikeDomain(path string) bool {
+	host, _, ok := strings.Cut(path, "/")
+	return ok && strings.Contains(host, ".")
+}
 
 const (
 	maxFiles     = 10

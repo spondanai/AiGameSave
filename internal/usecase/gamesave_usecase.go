@@ -2,6 +2,8 @@ package usecase
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/spondanai/aigamesave/internal/adapters"
@@ -53,12 +55,27 @@ func SaveGameWithAdapter(workingDir, adapterName string) error {
 		state.RecentTurns[i].Content = redaction.MaskSecrets(state.RecentTurns[i].Content)
 	}
 
+	state.ActiveFiles = filterExistingPaths(workingDir, domain.ExtractFilePaths(state.RecentTurns))
+
 	if err := repository.SaveSession(workingDir, state); err != nil {
 		return fmt.Errorf("failed to save session: %w", err)
 	}
 
 	fmt.Println("Successfully saved session to .aigamesave.yaml")
 	return nil
+}
+
+// filterExistingPaths returns only paths that resolve to real files under workingDir.
+func filterExistingPaths(workingDir string, paths []string) []string {
+	var result []string
+	for _, p := range paths {
+		abs := filepath.Join(workingDir, p)
+		info, err := os.Stat(abs)
+		if err == nil && !info.IsDir() {
+			result = append(result, p)
+		}
+	}
+	return result
 }
 
 // LoadGame reads the save file, formats a resume prompt, and copies it to the clipboard.
@@ -76,9 +93,18 @@ func LoadGame(workingDir string, toClipboard bool) (string, error) {
 		fmt.Fprintf(&sb, "[%s]: %s\n", turn.Role, turn.Content)
 	}
 
-	sb.WriteString("\n## Files being worked on\n")
-	for _, file := range state.GitVision {
-		fmt.Fprintf(&sb, "- %s (status: %s)\n", file.Path, file.Status)
+	if len(state.ActiveFiles) > 0 {
+		sb.WriteString("\n## Active files (mentioned in conversation)\n")
+		for _, p := range state.ActiveFiles {
+			fmt.Fprintf(&sb, "- %s\n", p)
+		}
+	}
+
+	if len(state.GitVision) > 0 {
+		sb.WriteString("\n## Files being worked on (git status)\n")
+		for _, file := range state.GitVision {
+			fmt.Fprintf(&sb, "- %s [%s]\n", file.Path, file.Status)
+		}
 	}
 
 	if state.Diff != "" {
