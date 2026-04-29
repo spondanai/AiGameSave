@@ -20,8 +20,8 @@ AGS solves this by:
 
 ## 🚀 Supported AI CLIs
 - ✅ **Aider** (`.aider.chat.history.md`)
-- ✅ **Claude Code** (`.claude/history.jsonl`)
-- ✅ **Gemini CLI** (`.gemini_history.jsonl` or `.gemini/history.jsonl`)
+- ✅ **Claude Code** (`~/.claude/projects/<encoded-dir>/*.jsonl`)
+- ✅ **Gemini CLI** (`~/.gemini/tmp/<user>/chats/*.jsonl`, correlated by `projectHash`)
 - ⏳ *Cline (Coming Soon - PRs welcome!)*
 - ⏳ *Cursor (Coming Soon)*
 

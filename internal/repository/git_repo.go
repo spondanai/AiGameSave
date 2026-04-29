@@ -45,20 +45,44 @@ func GetModifiedFiles(workingDir string) ([]domain.FileMetadata, error) {
 	return files, nil
 }
 
-// GetDiff runs `git diff HEAD` and returns the output truncated to maxBytes.
-// Returns an empty string if not a git repo or there is nothing to diff.
+// GetDiff returns a combined diff: `git diff HEAD` for tracked changes plus
+// the content of untracked files (from `git ls-files --others --exclude-standard`).
+// Total output is truncated to maxBytes.
 func GetDiff(workingDir string, maxBytes int) string {
-	cmd := exec.Command("git", "diff", "HEAD")
-	cmd.Dir = workingDir
+	var sb strings.Builder
 
-	out, err := cmd.Output()
-	if err != nil || len(out) == 0 {
-		return ""
+	// Tracked changes
+	if out, err := runGit(workingDir, "diff", "HEAD"); err == nil && len(out) > 0 {
+		sb.Write(out)
 	}
 
-	diff := string(out)
+	// Untracked files — include their full content so new-file sessions are not context-blind
+	if out, err := runGit(workingDir, "ls-files", "--others", "--exclude-standard"); err == nil {
+		for rel := range strings.SplitSeq(strings.TrimSpace(string(out)), "\n") {
+			if rel == "" {
+				continue
+			}
+			content, err := os.ReadFile(filepath.Join(workingDir, rel))
+			if err != nil {
+				continue
+			}
+			sb.WriteString("\n--- untracked: " + rel + " ---\n")
+			sb.Write(content)
+		}
+	}
+
+	diff := sb.String()
+	if len(diff) == 0 {
+		return ""
+	}
 	if len(diff) > maxBytes {
 		diff = diff[:maxBytes] + "\n... [diff truncated] ..."
 	}
 	return diff
+}
+
+func runGit(workingDir string, args ...string) ([]byte, error) {
+	cmd := exec.Command("git", args...)
+	cmd.Dir = workingDir
+	return cmd.Output()
 }
