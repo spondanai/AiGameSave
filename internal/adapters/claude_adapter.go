@@ -19,38 +19,55 @@ func NewClaudeAdapter() *ClaudeAdapter {
 	return &ClaudeAdapter{}
 }
 
-// claudeProjectDir returns the ~/.claude/projects/<encoded-workingDir> path.
-// Claude Code encodes the working directory by replacing all "/" with "-".
-func claudeProjectDir(workingDir string) string {
+// encodeClaudePath mirrors Claude Code's directory encoding:
+// both "/" and "." are replaced with "-".
+func encodeClaudePath(dir string) string {
+	r := strings.NewReplacer("/", "-", ".", "-")
+	return r.Replace(dir)
+}
+
+// findClaudeProjectDir walks up from workingDir toward home, returning the first
+// ~/.claude/projects/<encoded-dir> that contains at least one .jsonl session file.
+// This handles the common case where Claude Code is launched from a parent directory
+// (e.g., home) while ags is run from a subdirectory.
+func findClaudeProjectDir(workingDir string) string {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		return ""
 	}
-	encoded := strings.ReplaceAll(workingDir, "/", "-")
-	return filepath.Join(homeDir, ".claude", "projects", encoded)
+	projectsRoot := filepath.Join(homeDir, ".claude", "projects")
+
+	dir := workingDir
+	for {
+		encoded := encodeClaudePath(dir)
+		candidate := filepath.Join(projectsRoot, encoded)
+
+		entries, err := os.ReadDir(candidate)
+		if err == nil {
+			for _, e := range entries {
+				if !e.IsDir() && strings.HasSuffix(e.Name(), ".jsonl") {
+					return candidate
+				}
+			}
+		}
+
+		// Stop at home directory — no point going higher.
+		if dir == homeDir || dir == "/" || dir == "." {
+			break
+		}
+		dir = filepath.Dir(dir)
+	}
+	return ""
 }
 
-// Detect checks if Claude Code has a session for the current working directory.
+// Detect checks if Claude Code has a session for the working directory or any parent.
 func (c *ClaudeAdapter) Detect(workingDir string) bool {
-	projectDir := claudeProjectDir(workingDir)
-	if projectDir == "" {
-		return false
-	}
-	entries, err := os.ReadDir(projectDir)
-	if err != nil {
-		return false
-	}
-	for _, e := range entries {
-		if !e.IsDir() && strings.HasSuffix(e.Name(), ".jsonl") {
-			return true
-		}
-	}
-	return false
+	return findClaudeProjectDir(workingDir) != ""
 }
 
 // getLatestSession returns the path to the most recently modified session file.
 func (c *ClaudeAdapter) getLatestSession(workingDir string) (string, error) {
-	projectDir := claudeProjectDir(workingDir)
+	projectDir := findClaudeProjectDir(workingDir)
 
 	entries, err := os.ReadDir(projectDir)
 	if err != nil {
