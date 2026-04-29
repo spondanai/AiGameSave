@@ -105,14 +105,8 @@ func (a *AiderAdapter) Extract(workingDir string) (domain.SessionState, error) {
 		return domain.SessionState{}, err
 	}
 
-	// Keep only the last 6 turns (3 pairs of User/Assistant roughly)
-	maxTurns := 6
-	if len(turns) > maxTurns {
-		turns = turns[len(turns)-maxTurns:]
-	}
-
 	return domain.SessionState{
-		RecentTurns: turns,
+		RecentTurns: selectContext(turns),
 	}, nil
 }
 

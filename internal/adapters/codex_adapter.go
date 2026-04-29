@@ -198,12 +198,7 @@ func (c *CodexAdapter) Extract(workingDir string) (domain.SessionState, error) {
 		turns = append(turns, turn)
 	}
 
-	maxTurns := 6
-	if len(turns) > maxTurns {
-		turns = turns[len(turns)-maxTurns:]
-	}
-
-	return domain.SessionState{RecentTurns: turns}, nil
+	return domain.SessionState{RecentTurns: selectContext(turns)}, nil
 }
 
 func parseCodexTurn(line []byte) (domain.Turn, bool) {

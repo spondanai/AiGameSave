@@ -223,12 +223,7 @@ func (c *CopilotAdapter) Extract(workingDir string) (domain.SessionState, error)
 		}
 	}
 
-	maxTurns := 6
-	if len(turns) > maxTurns {
-		turns = turns[len(turns)-maxTurns:]
-	}
-
-	return domain.SessionState{RecentTurns: turns}, nil
+	return domain.SessionState{RecentTurns: selectContext(turns)}, nil
 }
 
 func (c *CopilotAdapter) Name() string {

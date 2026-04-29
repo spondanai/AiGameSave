@@ -208,12 +208,7 @@ func (c *ClaudeAdapter) Extract(workingDir string) (domain.SessionState, error) 
 		turns = append(turns, domain.Turn{Role: cl.Type, Content: content})
 	}
 
-	maxTurns := 6
-	if len(turns) > maxTurns {
-		turns = turns[len(turns)-maxTurns:]
-	}
-
-	return domain.SessionState{RecentTurns: turns}, nil
+	return domain.SessionState{RecentTurns: selectContext(turns)}, nil
 }
 
 func (c *ClaudeAdapter) Name() string {
