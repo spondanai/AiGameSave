@@ -4,11 +4,11 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/spondanai/AiGameSave/internal/adapters"
-	"github.com/spondanai/AiGameSave/internal/domain"
-	"github.com/spondanai/AiGameSave/internal/repository"
-	"github.com/spondanai/AiGameSave/pkg/redaction"
-	"github.com/spondanai/AiGameSave/pkg/clipboard"
+	"github.com/spondanai/aigamesave/internal/adapters"
+	"github.com/spondanai/aigamesave/internal/domain"
+	"github.com/spondanai/aigamesave/internal/repository"
+	"github.com/spondanai/aigamesave/pkg/redaction"
+	"github.com/spondanai/aigamesave/pkg/clipboard"
 )
 
 // SaveGame coordinates the process of extracting context and saving it to YAML.

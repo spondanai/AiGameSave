@@ -1,7 +1,7 @@
 package adapters
 
 import (
-	"github.com/spondanai/AiGameSave/internal/domain"
+	"github.com/spondanai/aigamesave/internal/domain"
 )
 
 // Registry holds all registered AI CLI adapters.

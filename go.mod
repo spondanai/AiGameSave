@@ -1,4 +1,4 @@
-module github.com/spondanai/AiGameSave
+module github.com/spondanai/aigamesave
 
 go 1.25.4
 

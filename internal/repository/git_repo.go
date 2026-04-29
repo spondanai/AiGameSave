@@ -4,7 +4,7 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/spondanai/AiGameSave/internal/domain"
+	"github.com/spondanai/aigamesave/internal/domain"
 )
 
 // GetModifiedFiles runs `git status --porcelain` and returns the file metadata.
