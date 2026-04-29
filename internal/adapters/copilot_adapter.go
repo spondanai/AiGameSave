@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 	"time"
@@ -14,7 +15,10 @@ import (
 )
 
 // CopilotAdapter reads GitHub Copilot Chat sessions stored by VS Code.
-// Sessions live in ~/Library/Application Support/Code/User/workspaceStorage/<hash>/chatSessions/*.json
+// Sessions live in:
+//   - macOS:   ~/Library/Application Support/Code/User/workspaceStorage/<hash>/chatSessions/*.json
+//   - Linux:   ~/.config/Code/User/workspaceStorage/...
+//   - Windows: %APPDATA%\Code\User\workspaceStorage\...
 type CopilotAdapter struct{}
 
 func NewCopilotAdapter() *CopilotAdapter {
@@ -26,7 +30,24 @@ func vscodeWorkspaceStorageRoot() string {
 	if err != nil {
 		return ""
 	}
-	return filepath.Join(homeDir, "Library", "Application Support", "Code", "User", "workspaceStorage")
+
+	switch runtime.GOOS {
+	case "windows":
+		appData := os.Getenv("APPDATA")
+		if appData == "" {
+			appData = filepath.Join(homeDir, "AppData", "Roaming")
+		}
+		return filepath.Join(appData, "Code", "User", "workspaceStorage")
+	case "darwin":
+		return filepath.Join(homeDir, "Library", "Application Support", "Code", "User", "workspaceStorage")
+	default: // linux and others
+		// Respect $XDG_CONFIG_HOME if set
+		configDir := os.Getenv("XDG_CONFIG_HOME")
+		if configDir == "" {
+			configDir = filepath.Join(homeDir, ".config")
+		}
+		return filepath.Join(configDir, "Code", "User", "workspaceStorage")
+	}
 }
 
 // findWorkspaceStorageDir scans workspaceStorage for a folder whose workspace.json
@@ -105,15 +126,15 @@ func readWorkspaceFolder(wsFile string) (string, error) {
 }
 
 type copilotSession struct {
-	SessionID       string            `json:"sessionId"`
-	LastMessageDate int64             `json:"lastMessageDate"`
-	Requests        []copilotRequest  `json:"requests"`
+	SessionID       string           `json:"sessionId"`
+	LastMessageDate int64            `json:"lastMessageDate"`
+	Requests        []copilotRequest `json:"requests"`
 }
 
 type copilotRequest struct {
-	Message   copilotMessage   `json:"message"`
+	Message   copilotMessage    `json:"message"`
 	Response  []copilotResponse `json:"response"`
-	Timestamp int64            `json:"timestamp"`
+	Timestamp int64             `json:"timestamp"`
 }
 
 type copilotMessage struct {

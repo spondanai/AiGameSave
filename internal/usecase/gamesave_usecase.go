@@ -15,17 +15,30 @@ import (
 
 const maxDiffBytes = 3000
 
-// SaveGame coordinates the process of extracting context and saving it to YAML.
-func SaveGame(workingDir string) error {
-	return SaveGameWithAdapter(workingDir, "")
+// SaveOptions controls optional behaviour of the save pipeline.
+type SaveOptions struct {
+	// AdapterName forces a specific AI adapter (empty = auto-detect).
+	AdapterName string
+	// NoDiff skips embedding the git diff in the saved state.
+	NoDiff bool
 }
 
+// SaveGame coordinates the process of extracting context and saving it to YAML.
+func SaveGame(workingDir string) error {
+	return SaveGameWithOptions(workingDir, SaveOptions{})
+}
+
+// SaveGameWithAdapter is kept for backwards compatibility.
 func SaveGameWithAdapter(workingDir, adapterName string) error {
+	return SaveGameWithOptions(workingDir, SaveOptions{AdapterName: adapterName})
+}
+
+func SaveGameWithOptions(workingDir string, opts SaveOptions) error {
 	var adapter domain.HistoryExtractor
 	var err error
 
-	if adapterName != "" {
-		adapter, err = adapters.DetectAdapterByName(workingDir, adapterName)
+	if opts.AdapterName != "" {
+		adapter, err = adapters.DetectAdapterByName(workingDir, opts.AdapterName)
 		if err != nil {
 			return err
 		}
@@ -46,7 +59,9 @@ func SaveGameWithAdapter(workingDir, adapterName string) error {
 	files, err := repository.GetModifiedFiles(workingDir)
 	if err == nil {
 		state.GitVision = domain.RankFiles(files, state.RecentTurns)
-		state.Diff = redaction.MaskSecrets(repository.GetDiff(workingDir, maxDiffBytes))
+		if !opts.NoDiff {
+			state.Diff = redaction.MaskSecrets(repository.GetDiff(workingDir, maxDiffBytes))
+		}
 	} else {
 		fmt.Println("Warning: Could not get git status (maybe not a repo?)")
 	}

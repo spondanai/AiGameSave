@@ -34,6 +34,7 @@ var saveCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		warnIfUpdateAvailable()
 		adapterName, _ := cmd.Flags().GetString("adapter")
+		noDiff, _ := cmd.Flags().GetBool("no-diff")
 
 		cwd, err := os.Getwd()
 		if err != nil {
@@ -41,7 +42,10 @@ var saveCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
-		err = usecase.SaveGameWithAdapter(cwd, adapterName)
+		err = usecase.SaveGameWithOptions(cwd, usecase.SaveOptions{
+			AdapterName: adapterName,
+			NoDiff:      noDiff,
+		})
 		if err != nil {
 			fmt.Println("Error:", err)
 			os.Exit(1)
@@ -88,6 +92,7 @@ var selfUpdateCmd = &cobra.Command{
 
 func init() {
 	saveCmd.Flags().String("adapter", "", fmt.Sprintf("Force a specific adapter (%s)", strings.Join(adapters.AdapterNames(), ", ")))
+	saveCmd.Flags().Bool("no-diff", false, "Skip embedding the git diff in the saved state")
 	loadCmd.Flags().Bool("stdout", false, "Print to stdout instead of copying to clipboard")
 	rootCmd.AddCommand(saveCmd, loadCmd, selfUpdateCmd)
 }
