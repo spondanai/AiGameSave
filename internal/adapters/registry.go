@@ -18,7 +18,7 @@ type activeAdapter interface {
 func init() {
 	// Register known adapters here.
 	// In the future, we can iterate over these dynamically.
-	registry = append(registry, NewAiderAdapter(), NewClaudeAdapter(), NewGeminiAdapter(), NewCodexAdapter())
+	registry = append(registry, NewAiderAdapter(), NewClaudeAdapter(), NewGeminiAdapter(), NewCodexAdapter(), NewCopilotAdapter())
 }
 
 // DetectActiveAdapter chooses the matching adapter with the most recently
@@ -83,5 +83,5 @@ func normalizeAdapterName(name string) string {
 
 func adapterNameMatches(adapterName, wanted string) bool {
 	normalized := normalizeAdapterName(adapterName)
-	return normalized == wanted || strings.HasPrefix(normalized, wanted)
+	return normalized == wanted || strings.HasPrefix(normalized, wanted) || strings.HasSuffix(normalized, wanted)
 }
