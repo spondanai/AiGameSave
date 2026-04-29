@@ -1,5 +1,7 @@
 package domain
 
+import "time"
+
 // SessionState represents the state extracted from a project for saving.
 type SessionState struct {
 	RecentTurns []Turn
@@ -8,15 +10,16 @@ type SessionState struct {
 
 // Turn represents a single interaction in the history.
 type Turn struct {
-	Role    string // e.g., "user", "assistant"
-	Content string // The text content
+	Role    string
+	Content string
 }
 
 // FileMetadata represents a file that has been changed or mentioned.
 type FileMetadata struct {
 	Path     string
-	Status   string // e.g., "M", "??", "A"
-	Priority int    // For git ranking heuristic
+	Status   string    // e.g., "M", "??", "A"
+	Priority int       // Final ranking score
+	ModTime  time.Time `yaml:"-"` // Used for ranking only, not persisted
 }
 
 // HistoryExtractor is the interface that all AI CLI adapters must implement.
