@@ -138,24 +138,45 @@ func (g *GeminiAdapter) Extract(workingDir string) (domain.SessionState, error) 
 	defer file.Close()
 
 	var turns []domain.Turn
-	scanner := bufio.NewScanner(file)
-	scanner.Buffer(make([]byte, 1024*1024), 1024*1024)
+	reader := bufio.NewReader(file)
 
 	type GeminiLine struct {
 		Type    string `json:"type"`
 		Content any    `json:"content"`
 	}
 
-	for scanner.Scan() {
-		line := scanner.Bytes()
+	for {
+		line, isPrefix, err := reader.ReadLine()
+		if err != nil {
+			break
+		}
+
+		var fullLine []byte
+		fullLine = append(fullLine, line...)
+
+		for isPrefix {
+			line, isPrefix, err = reader.ReadLine()
+			if err != nil {
+				break
+			}
+			// Cap line size to ~5MB to prevent OOM
+			if len(fullLine) < 5*1024*1024 {
+				fullLine = append(fullLine, line...)
+			}
+		}
+
+		if len(fullLine) >= 5*1024*1024 {
+			continue // Skip overly large lines
+		}
 
 		// Skip metadata lines (first line and any state updates)
-		if strings.HasPrefix(string(line), `{"$set"`) || strings.Contains(string(line), `"sessionId"`) || strings.Contains(string(line), `"projectHash"`) {
+		lineStr := string(fullLine)
+		if strings.HasPrefix(lineStr, `{"$set"`) || strings.Contains(lineStr, `"sessionId"`) || strings.Contains(lineStr, `"projectHash"`) {
 			continue
 		}
 
 		var gl GeminiLine
-		if err := json.Unmarshal(line, &gl); err == nil {
+		if err := json.Unmarshal(fullLine, &gl); err == nil {
 			role := gl.Type
 			if role == "" {
 				continue
@@ -185,10 +206,6 @@ func (g *GeminiAdapter) Extract(workingDir string) (domain.SessionState, error) 
 			}
 			turns = append(turns, domain.Turn{Role: role, Content: contentStr})
 		}
-	}
-
-	if err := scanner.Err(); err != nil {
-		return domain.SessionState{}, err
 	}
 
 	maxTurns := 6

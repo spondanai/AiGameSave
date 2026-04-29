@@ -1,6 +1,7 @@
 package adapters
 
 import (
+	"bufio"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -133,13 +134,34 @@ func (c *ClaudeAdapter) Extract(workingDir string) (domain.SessionState, error) 
 	}
 
 	var turns []domain.Turn
-	// Use json.Decoder instead of bufio.Scanner — no per-line buffer limit,
-	// so arbitrarily large tool outputs in JSONL won't cause extraction failure.
-	dec := json.NewDecoder(file)
+	reader := bufio.NewReader(file)
 
-	for dec.More() {
+	for {
+		line, isPrefix, err := reader.ReadLine()
+		if err != nil {
+			break
+		}
+
+		var fullLine []byte
+		fullLine = append(fullLine, line...)
+
+		for isPrefix {
+			line, isPrefix, err = reader.ReadLine()
+			if err != nil {
+				break
+			}
+			// Cap line size to ~5MB to prevent OOM
+			if len(fullLine) < 5*1024*1024 {
+				fullLine = append(fullLine, line...)
+			}
+		}
+
+		if len(fullLine) >= 5*1024*1024 {
+			continue // Skip overly large lines
+		}
+
 		var cl ClaudeLine
-		if err := dec.Decode(&cl); err != nil {
+		if err := json.Unmarshal(fullLine, &cl); err != nil {
 			continue
 		}
 
