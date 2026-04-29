@@ -120,6 +120,7 @@ ags save
   ├─ Anchor & Extract ── Finds the last substantial user instruction + last 5 turns after it
   ├─ File Context ─────── Regex-extracts file paths from conversation; verifies they exist on disk
   ├─ Git Vision ────────── git status --porcelain → ranks files by recency + mention count
+  ├─ Ignore Filter ─────── Applies .aigamesaveignore rules to GitVision + ActiveFiles
   ├─ Redact ────────────── Strips common secret patterns (API keys, tokens)
   └─ Save ──────────────── Writes .aigamesave.yaml
 
@@ -127,6 +128,33 @@ ags load
   │
   └─ Reads .aigamesave.yaml → formats resume prompt → clipboard (or stdout)
 ```
+
+---
+
+## 🚫 Token Optimization — `.aigamesaveignore`
+
+Create a `.aigamesaveignore` file in your project root to exclude files from the saved context. This keeps token usage low when your project has large generated files, vendor directories, or lockfiles.
+
+**Syntax** (subset of `.gitignore`):
+
+```gitignore
+# Exclude a directory and everything inside it
+vendor/
+node_modules/
+
+# Exclude by file extension (matches anywhere in the tree)
+*.pb.go
+*.gen.go
+go.sum
+
+# Exclude an exact path or glob
+internal/generated/*.go
+dist/**
+```
+
+Copy [`.aigamesaveignore.example`](.aigamesaveignore.example) from the repo as a starting point.
+
+Unlike `.gitignore`, this file is **project-specific configuration** — you should commit it so the whole team shares the same context budget.
 
 ---
 

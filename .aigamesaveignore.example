@@ -1,0 +1,36 @@
+# .aigamesaveignore — exclude files from ags save context to keep token usage low.
+# Copy this file to .aigamesaveignore and edit to suit your project.
+# Syntax: a subset of .gitignore rules.
+#   pattern/          — exclude a directory and everything inside it
+#   pattern/**        — same as above
+#   *.ext             — exclude by file extension (basename match)
+#   **/pattern        — exclude by basename anywhere in the tree
+#   path/to/file.go   — exclude an exact path (supports * and ? globs)
+
+# ── Dependency lockfiles (rarely useful context) ──────────────────────────────
+go.sum
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+Gemfile.lock
+poetry.lock
+
+# ── Vendored code ──────────────────────────────────────────────────────────────
+vendor/
+node_modules/
+
+# ── Build artefacts ────────────────────────────────────────────────────────────
+dist/
+build/
+out/
+bin/
+
+# ── Generated / compiled files ─────────────────────────────────────────────────
+*.pb.go
+*.gen.go
+*.min.js
+*.min.css
+
+# ── Test fixtures / snapshots (often very large) ───────────────────────────────
+testdata/
+__snapshots__/

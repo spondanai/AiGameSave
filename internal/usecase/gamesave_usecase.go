@@ -10,6 +10,7 @@ import (
 	"github.com/spondanai/aigamesave/internal/domain"
 	"github.com/spondanai/aigamesave/internal/repository"
 	"github.com/spondanai/aigamesave/pkg/clipboard"
+	"github.com/spondanai/aigamesave/pkg/ignore"
 	"github.com/spondanai/aigamesave/pkg/redaction"
 )
 
@@ -72,12 +73,38 @@ func SaveGameWithOptions(workingDir string, opts SaveOptions) error {
 
 	state.ActiveFiles = filterExistingPaths(workingDir, domain.ExtractFilePaths(state.RecentTurns))
 
+	ignoreRules, _ := ignore.Load(workingDir)
+	state.GitVision = filterIgnored(state.GitVision, func(f domain.FileMetadata) string { return f.Path }, ignoreRules)
+	state.ActiveFiles = filterIgnoredStrings(state.ActiveFiles, ignoreRules)
+
 	if err := repository.SaveSession(workingDir, state); err != nil {
 		return fmt.Errorf("failed to save session: %w", err)
 	}
 
 	fmt.Println("Successfully saved session to .aigamesave.yaml")
 	return nil
+}
+
+// filterIgnored removes FileMetadata entries whose paths match ignoreRules.
+func filterIgnored(files []domain.FileMetadata, key func(domain.FileMetadata) string, rules *ignore.Rules) []domain.FileMetadata {
+	out := files[:0:0]
+	for _, f := range files {
+		if !rules.Ignored(key(f)) {
+			out = append(out, f)
+		}
+	}
+	return out
+}
+
+// filterIgnoredStrings removes string paths that match ignoreRules.
+func filterIgnoredStrings(paths []string, rules *ignore.Rules) []string {
+	out := paths[:0:0]
+	for _, p := range paths {
+		if !rules.Ignored(p) {
+			out = append(out, p)
+		}
+	}
+	return out
 }
 
 // filterExistingPaths returns only paths that resolve to real files under workingDir.
