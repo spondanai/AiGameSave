@@ -54,6 +54,14 @@ ags save
 ```
 *What happens:* AGS detects your AI CLI, extracts the last ~3 conversation turns, runs a Git vision check to find modified files, redacts secrets, and saves everything into a tiny `.aigamesave.yaml` file (which is automatically added to `.gitignore`).
 
+If you use multiple AI CLIs in the same project, AGS chooses the adapter with
+the most recently active matching session. You can override that choice:
+
+```bash
+ags save --adapter codex
+ags save --adapter gemini
+```
+
 ### 2. Load Your Game
 When you return, simply run:
 ```bash

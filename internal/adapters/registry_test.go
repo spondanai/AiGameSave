@@ -87,3 +87,44 @@ func TestDetectActiveAdapterIgnoresUndetectedAdapters(t *testing.T) {
 		t.Fatalf("expected Gemini CLI, got %s", selected.Name())
 	}
 }
+
+func TestDetectAdapterByNameMatchesNormalizedName(t *testing.T) {
+	now := time.Now()
+	withRegistry(t,
+		fakeAdapter{name: "Claude Code", detected: true, lastActive: now},
+		fakeAdapter{name: "Gemini CLI", detected: true, lastActive: now},
+	)
+
+	selected, err := DetectAdapterByName(t.TempDir(), "claude-code")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if selected.Name() != "Claude Code" {
+		t.Fatalf("expected Claude Code, got %s", selected.Name())
+	}
+}
+
+func TestDetectAdapterByNameMatchesShortName(t *testing.T) {
+	now := time.Now()
+	withRegistry(t,
+		fakeAdapter{name: "Claude Code", detected: true, lastActive: now},
+		fakeAdapter{name: "Gemini CLI", detected: true, lastActive: now},
+	)
+
+	selected, err := DetectAdapterByName(t.TempDir(), "gemini")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if selected.Name() != "Gemini CLI" {
+		t.Fatalf("expected Gemini CLI, got %s", selected.Name())
+	}
+}
+
+func TestDetectAdapterByNameRequiresDetectedAdapter(t *testing.T) {
+	withRegistry(t, fakeAdapter{name: "Codex", detected: false})
+
+	_, err := DetectAdapterByName(t.TempDir(), "codex")
+	if err == nil {
+		t.Fatal("expected an error")
+	}
+}

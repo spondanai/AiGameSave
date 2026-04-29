@@ -15,7 +15,21 @@ const maxDiffBytes = 3000
 
 // SaveGame coordinates the process of extracting context and saving it to YAML.
 func SaveGame(workingDir string) error {
-	adapter := adapters.DetectActiveAdapter(workingDir)
+	return SaveGameWithAdapter(workingDir, "")
+}
+
+func SaveGameWithAdapter(workingDir, adapterName string) error {
+	var adapter domain.HistoryExtractor
+	var err error
+
+	if adapterName != "" {
+		adapter, err = adapters.DetectAdapterByName(workingDir, adapterName)
+		if err != nil {
+			return err
+		}
+	} else {
+		adapter = adapters.DetectActiveAdapter(workingDir)
+	}
 	if adapter == nil {
 		return fmt.Errorf("no supported AI CLI found in the current directory")
 	}

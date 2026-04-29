@@ -13,7 +13,7 @@ go build ./...
 go run ./cmd/ags save   # test against your own project
 ```
 
-Requirements: Go 1.21+
+Requirements: the Go version declared in `go.mod`.
 
 ---
 
@@ -28,7 +28,8 @@ internal/
 │   ├── registry.go       ← Register your adapter here (one line)
 │   ├── aider_adapter.go  ← Example: parses .aider.chat.history.md
 │   ├── claude_adapter.go ← Example: parses ~/.claude/projects/
-│   └── gemini_adapter.go ← Example: parses ~/.gemini/tmp/
+│   ├── gemini_adapter.go ← Example: parses ~/.gemini/tmp/
+│   └── codex_adapter.go  ← Example: parses ~/.codex/sessions/
 ├── usecase/
 │   └── gamesave_usecase.go ← Orchestration (no need to touch)
 └── repository/
@@ -73,6 +74,16 @@ func (a *MyCLIAdapter) Extract(workingDir string) (domain.SessionState, error) {
     return domain.SessionState{RecentTurns: turns}, nil
 }
 
+// LastActive returns the modification time of the matched session/history file.
+// AGS uses this to choose the right adapter when multiple AI CLIs are present.
+func (a *MyCLIAdapter) LastActive(workingDir string) (time.Time, error) {
+    info, err := os.Stat(filepath.Join(workingDir, ".mycli_history"))
+    if err != nil {
+        return time.Time{}, err
+    }
+    return info.ModTime(), nil
+}
+
 func (a *MyCLIAdapter) Name() string { return "MyCLI" }
 ```
 
@@ -86,12 +97,15 @@ func init() {
         NewAiderAdapter(),
         NewClaudeAdapter(),
         NewGeminiAdapter(),
+        NewCodexAdapter(),
         NewMyCLIAdapter(), // ← add here
     )
 }
 ```
 
-> **Order matters.** `DetectActiveAdapter` returns the first match. Put more specific adapters (project-local history files) before global ones.
+`DetectActiveAdapter` chooses the detected adapter with the newest `LastActive`
+timestamp. This keeps `ags save` pointed at the AI CLI the user touched most
+recently when several tools have sessions for the same project.
 
 ### Step 3 — Test it
 
@@ -123,6 +137,11 @@ type HistoryExtractor interface {
     Name() string
 }
 
+// Adapters should also implement:
+type activeAdapter interface {
+    LastActive(workingDir string) (time.Time, error)
+}
+
 type SessionState struct {
     RecentTurns []Turn
     GitVision   []FileMetadata // populated by usecase, not your adapter
@@ -140,9 +159,9 @@ type Turn struct {
 
 | Situation | Recommendation |
 |---|---|
-| History file is JSONL | Use `bufio.Scanner` with a 1MB buffer (`scanner.Buffer(make([]byte, 1<<20), 1<<20)`) |
+| History file is JSONL | Read line-by-line with `bufio.Reader.ReadLine` or a similar limited reader, and skip/truncate oversized lines |
 | History file is Markdown | Parse role headers line-by-line like `aider_adapter.go` |
-| Tool stores history globally (not per-project) | Note it in a comment on `Detect`; still safe to add |
+| Tool stores history globally (not per-project) | Correlate the session to `workingDir` using metadata, project hash, or cwd before `Detect` returns true |
 | Content can be very long | Truncate at 1500 chars: `content[:1500] + "\n... [truncated] ..."` |
 | Code blocks in history | Skip lines after 50 inside a code block (see `aider_adapter.go`) |
 

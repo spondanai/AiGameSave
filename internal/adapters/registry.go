@@ -1,6 +1,8 @@
 package adapters
 
 import (
+	"fmt"
+	"strings"
 	"time"
 
 	"github.com/spondanai/aigamesave/internal/domain"
@@ -49,4 +51,37 @@ func DetectActiveAdapter(workingDir string) domain.HistoryExtractor {
 	}
 
 	return selected
+}
+
+func DetectAdapterByName(workingDir, name string) (domain.HistoryExtractor, error) {
+	wanted := normalizeAdapterName(name)
+	for _, adapter := range registry {
+		if !adapterNameMatches(adapter.Name(), wanted) {
+			continue
+		}
+		if !adapter.Detect(workingDir) {
+			return nil, fmt.Errorf("%s was requested, but no matching session was found in this directory", adapter.Name())
+		}
+		return adapter, nil
+	}
+	return nil, fmt.Errorf("unknown adapter %q (available: %s)", name, strings.Join(AdapterNames(), ", "))
+}
+
+func AdapterNames() []string {
+	names := make([]string, 0, len(registry))
+	for _, adapter := range registry {
+		names = append(names, adapter.Name())
+	}
+	return names
+}
+
+func normalizeAdapterName(name string) string {
+	name = strings.ToLower(strings.TrimSpace(name))
+	replacer := strings.NewReplacer(" ", "", "-", "", "_", "")
+	return replacer.Replace(name)
+}
+
+func adapterNameMatches(adapterName, wanted string) bool {
+	normalized := normalizeAdapterName(adapterName)
+	return normalized == wanted || strings.HasPrefix(normalized, wanted)
 }
