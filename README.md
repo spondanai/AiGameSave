@@ -2,7 +2,7 @@
 
 **Zero-LLM context preservation tool for AI CLI Developers.**
 
-AiGameSave (AGS) acts like a "save point" for your AI coding sessions. It extracts your current context (recent conversation history + modified files) and saves it as a lightweight YAML file. When you start a new session the next day, you can "load" this save to bring your AI up to speed instantly—**without wasting massive amounts of tokens re-scanning the entire project.**
+AiGameSave (AGS) acts like a "save point" for your AI coding sessions. It extracts your current context (recent conversation history + modified files) and saves it as a lightweight YAML file. When you start a new session, you can "load" this save to bring your AI up to speed instantly—**without wasting massive amounts of tokens re-scanning the entire project.**
 
 [![Go Version](https://img.shields.io/github/go-mod/go-version/mrporing/aigamesave)](https://go.dev/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -10,21 +10,26 @@ AiGameSave (AGS) acts like a "save point" for your AI coding sessions. It extrac
 
 ## ✨ Why AGS?
 
-AI coding assistants (like Aider, Claude Code, or Cline) are powerful, but starting a new session often means losing context or spending dollars on input tokens just to re-read the workspace map.
+AI coding assistants are powerful, but starting a new session often means losing context—or spending dollars on input tokens just to re-read the workspace map. In agentic workflows this gets worse: the AI's own self-talk (running commands, checking logs, summarising results) can push your original instruction clean out of the context window.
 
 AGS solves this by:
-- **Zero Token Cost:** Uses 100% local Go logic (Git + File parsing). No API calls.
+- **Zero Token Cost:** Uses 100% local Go logic (Git + file parsing). No API calls.
+- **Instruction Anchoring:** Backward-searches for your last meaningful instruction so agentic self-talk can't evict it.
 - **Smart Truncation:** Automatically truncates massive code blocks and terminal outputs from the history.
-- **Auto-Redaction:** Sanitizes common API keys before saving to prevent accidental leaks.
+- **Auto-Redaction:** Sanitises common API keys before saving to prevent accidental leaks.
 - **Plug-and-Play Architecture:** Incredibly easy to add support for new AI CLIs.
 
 ## 🚀 Supported AI CLIs
-- ✅ **Aider** (`.aider.chat.history.md`)
-- ✅ **Claude Code** (`~/.claude/projects/<encoded-dir>/*.jsonl`)
-- ✅ **Gemini CLI** (`~/.gemini/tmp/<user>/chats/*.jsonl`, correlated by `projectHash`)
-- ✅ **Codex** (`~/.codex/sessions/**/*.jsonl`, correlated by session `cwd`)
-- ⏳ *Cline (Coming Soon - PRs welcome!)*
-- ⏳ *Cursor (Coming Soon)*
+
+| Tool | Session location |
+|---|---|
+| **Aider** | `.aider.chat.history.md` |
+| **Claude Code** | `~/.claude/projects/<encoded-dir>/*.jsonl` |
+| **Gemini CLI** | `~/.gemini/tmp/<user>/chats/*.jsonl` (correlated by `projectHash`) |
+| **Codex** | `~/.codex/sessions/**/*.jsonl` (correlated by session `cwd`) |
+| **GitHub Copilot** (VS Code) | `~/Library/Application Support/Code/User/workspaceStorage/<hash>/chatSessions/*.json` |
+| *Cline* | ⏳ Coming soon — PRs welcome |
+| *Cursor* | ⏳ Coming soon — PRs welcome |
 
 ---
 
@@ -36,8 +41,7 @@ Ensure you have Go installed, then run:
 go install github.com/spondanai/aigamesave/cmd/ags@latest
 ```
 
-AGS checks for newer versions when you run `ags save` or `ags load`. If a newer
-adapter update is available, update with:
+AGS checks for newer versions when you run `ags save` or `ags load`. If an update is available:
 
 ```bash
 ags self-update
@@ -45,101 +49,67 @@ ags self-update
 
 For offline or CI usage, disable the check with `AGS_SKIP_UPDATE_CHECK=1`.
 
+---
+
 ## 🎮 Usage
 
 ### 1. Save Your Game
-Before closing your terminal for the day, run:
+
+Before ending your session, run:
+
 ```bash
 ags save
 ```
-*What happens:* AGS detects your AI CLI, extracts the last ~3 conversation turns, runs a Git vision check to find modified files, redacts secrets, and saves everything into a tiny `.aigamesave.yaml` file (which is automatically added to `.gitignore`).
 
-If you use multiple AI CLIs in the same project, AGS chooses the adapter with
-the most recently active matching session. You can override that choice:
+AGS detects your active AI CLI, extracts conversation context, runs a Git vision check to find modified files, redacts secrets, and saves everything into a `.aigamesave.yaml` file (automatically added to `.gitignore`).
+
+**Context selection:** AGS does not blindly grab the last N turns. It backward-searches for your last meaningful instruction (≥10 characters), then keeps that anchor plus the most recent work the AI did afterwards. Short acknowledgements like "ok" or "ลองรันดู" are skipped so the anchor stays on your actual goal.
+
+If you use multiple AI CLIs in the same project, AGS picks the one with the most recently active session. Override manually:
 
 ```bash
 ags save --adapter codex
 ags save --adapter gemini
+ags save --adapter claude
+ags save --adapter copilot
 ```
 
+Short aliases work too: `--adapter github` or `--adapter githubcopilot` also resolve to GitHub Copilot.
+
 ### 2. Load Your Game
-When you return, simply run:
+
+When you return, run:
+
 ```bash
 ags load
 ```
-*What happens:* AGS reads the save file, formats a concise prompt, and **copies it directly to your clipboard**. 
 
-Just paste it into your AI CLI and say: *"Let's continue."*
+AGS reads the save file, formats a concise prompt, and **copies it directly to your clipboard**. Paste it into your AI CLI and say: *"Let's continue."*
 
-*(If you prefer to pipe the output, use `ags load --stdout`)*
-
----
-
-## 🛠️ How it Works
-
-AGS acts as a "Hard Support" that places wards (vision) for your AI. It follows a Clean Architecture approach:
-1. **Detect Adapter:** Scans the directory for known AI history files.
-2. **Extract & Clean:** Reads the history, truncates long blocks (>50 lines), and keeps only the most relevant recent turns.
-3. **Git Vision:** Runs `git status --porcelain` to identify files currently being worked on.
-4. **Package:** Combines this into a highly optimized prompt ready for the next session.
+Use `ags load --stdout` to pipe the output instead of copying to clipboard.
 
 ---
 
-## 🤝 Contributing (Adding a New AI Adapter)
+## 🛠️ How It Works
 
-AGS is built with a **Registry Pattern**, making it incredibly easy for anyone to add support for a new AI tool. You only need to create **one file**!
+1. **Detect Adapter** — Scans for known AI history files; picks the one touched most recently.
+2. **Anchor & Extract** — Finds the last substantial user instruction, keeps that + the most recent 5 turns after it.
+3. **Git Vision** — Runs `git status --porcelain` to identify files currently being worked on.
+4. **Redact & Save** — Strips common secret patterns, then writes `.aigamesave.yaml`.
 
-### Step-by-Step Guide:
+---
 
-1. **Create an Adapter File:**
-   Create a new file in `internal/adapters/` (e.g., `cline_adapter.go`).
+## 🤝 Contributing
 
-2. **Implement the Interface:**
-   Your struct just needs to implement the `HistoryExtractor` interface from `internal/domain/extractor.go`:
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the full guide. The short version:
 
-   ```go
-   package adapters
-   
-   import "github.com/spondanai/aigamesave/internal/domain"
-
-   type MyAIAdapter struct{}
-
-   func NewMyAIAdapter() *MyAIAdapter { return &MyAIAdapter{} }
-
-   // Detect checks if this AI CLI is used in the current directory
-   func (a *MyAIAdapter) Detect(workingDir string) bool {
-       // e.g., check for a specific config folder
-       return true
-   }
-
-   // Extract parses the history and returns the SessionState
-   func (a *MyAIAdapter) Extract(workingDir string) (domain.SessionState, error) {
-       // 1. Read the specific history file
-       // 2. Parse turns (User/Assistant)
-       // 3. Truncate long content
-       // 4. Return the last ~3 turns
-       return domain.SessionState{RecentTurns: turns}, nil
-   }
-
-   func (a *MyAIAdapter) Name() string { return "MyAwesomeAI" }
-   ```
-
-3. **Register It:**
-   Open `internal/adapters/registry.go` and add your adapter to the `init()` function:
-   ```go
-   func init() {
-       registry = append(registry, 
-           NewAiderAdapter(), 
-           NewClaudeAdapter(),
-           NewMyAIAdapter(), // <-- Add yours here!
-       )
-   }
-   ```
-
-4. **Submit a PR!** 🎉
+1. Create `internal/adapters/<name>_adapter.go` and implement `HistoryExtractor`.
+2. Add your adapter to `registry.go`.
+3. Call `selectContext(turns)` (from `context.go`) instead of slicing turns manually.
+4. Open a PR. 🎉
 
 ### Good First Issues
-If you are looking to contribute, check our [Issues](https://github.com/spondanai/aigamesave/issues) tab. We are actively looking for help building adapters for **Cline**, **Cursor**, and improving our **Git Ranking Heuristics**.
+Check the [Issues tab](https://github.com/spondanai/aigamesave/issues). We are actively looking for adapters for **Cline** and **Cursor**.
 
 ---
 
