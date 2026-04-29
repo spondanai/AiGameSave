@@ -2,6 +2,8 @@ package adapters
 
 import (
 	"bufio"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -14,7 +16,8 @@ import (
 )
 
 // GeminiAdapter is the adapter for Gemini CLI.
-// Gemini CLI stores history globally in ~/.gemini/tmp/*/chats/, not per-project.
+// Gemini CLI stores history globally in ~/.gemini/tmp/<user>/chats/, indexed by
+// a projectHash (SHA-256 of the working directory) in each session's first line.
 type GeminiAdapter struct {
 	cachedChatFile string
 }
@@ -23,9 +26,54 @@ func NewGeminiAdapter() *GeminiAdapter {
 	return &GeminiAdapter{}
 }
 
-// getLatestChatFile finds the most recently modified .jsonl file across all ~/.gemini/tmp/*/chats/.
-// Result is cached to avoid redundant filesystem walks between Detect and Extract.
-func (g *GeminiAdapter) getLatestChatFile() (string, error) {
+// projectHash computes the SHA-256 hex digest of a directory path,
+// matching Gemini CLI's own session-to-project correlation.
+func projectHash(dir string) string {
+	sum := sha256.Sum256([]byte(dir))
+	return hex.EncodeToString(sum[:])
+}
+
+// candidateHashes returns hashes for workingDir and each parent up to home.
+// This handles the case where Gemini CLI was launched from a parent directory.
+func candidateHashes(workingDir string) map[string]struct{} {
+	homeDir, _ := os.UserHomeDir()
+	hashes := make(map[string]struct{})
+	dir := workingDir
+	for {
+		hashes[projectHash(dir)] = struct{}{}
+		if dir == homeDir || dir == "/" || dir == "." {
+			break
+		}
+		dir = filepath.Dir(dir)
+	}
+	return hashes
+}
+
+type geminiMeta struct {
+	ProjectHash string `json:"projectHash"`
+}
+
+// readProjectHash reads only the first line of a session file to extract projectHash.
+func readProjectHash(path string) string {
+	f, err := os.Open(path)
+	if err != nil {
+		return ""
+	}
+	defer f.Close()
+
+	scanner := bufio.NewScanner(f)
+	if scanner.Scan() {
+		var m geminiMeta
+		if err := json.Unmarshal(scanner.Bytes(), &m); err == nil {
+			return m.ProjectHash
+		}
+	}
+	return ""
+}
+
+// findChatFile searches ~/.gemini/tmp/*/chats/ for the most recently modified
+// session whose projectHash matches workingDir or any parent directory.
+func (g *GeminiAdapter) findChatFile(workingDir string) (string, error) {
 	if g.cachedChatFile != "" {
 		return g.cachedChatFile, nil
 	}
@@ -35,46 +83,50 @@ func (g *GeminiAdapter) getLatestChatFile() (string, error) {
 		return "", err
 	}
 
+	allowed := candidateHashes(workingDir)
 	tmpDir := filepath.Join(homeDir, ".gemini", "tmp")
 
 	type fileInfo struct {
 		path    string
 		modTime time.Time
 	}
-	var files []fileInfo
+	var matched []fileInfo
 
-	err = filepath.Walk(tmpDir, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return nil // ignore permission errors
+	_ = filepath.Walk(tmpDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil || info.IsDir() {
+			return nil
 		}
-		if !info.IsDir() && strings.HasSuffix(info.Name(), ".jsonl") && filepath.Base(filepath.Dir(path)) == "chats" {
-			files = append(files, fileInfo{path: path, modTime: info.ModTime()})
+		if !strings.HasSuffix(info.Name(), ".jsonl") || filepath.Base(filepath.Dir(path)) != "chats" {
+			return nil
+		}
+		hash := readProjectHash(path)
+		if _, ok := allowed[hash]; ok {
+			matched = append(matched, fileInfo{path: path, modTime: info.ModTime()})
 		}
 		return nil
 	})
 
-	if err != nil || len(files) == 0 {
-		return "", fmt.Errorf("no gemini chat files found in %s", tmpDir)
+	if len(matched) == 0 {
+		return "", fmt.Errorf("no gemini session found for %s", workingDir)
 	}
 
-	sort.Slice(files, func(i, j int) bool {
-		return files[i].modTime.After(files[j].modTime)
+	sort.Slice(matched, func(i, j int) bool {
+		return matched[i].modTime.After(matched[j].modTime)
 	})
 
-	g.cachedChatFile = files[0].path
+	g.cachedChatFile = matched[0].path
 	return g.cachedChatFile, nil
 }
 
-// Detect checks if Gemini CLI has any recent chat history.
-// Note: Gemini stores history globally, so this is not scoped to workingDir.
+// Detect returns true only if a Gemini session correlates with workingDir or a parent.
 func (g *GeminiAdapter) Detect(workingDir string) bool {
-	_, err := g.getLatestChatFile()
+	_, err := g.findChatFile(workingDir)
 	return err == nil
 }
 
-// Extract parses the Gemini CLI history file.
+// Extract parses the correlated Gemini CLI session file.
 func (g *GeminiAdapter) Extract(workingDir string) (domain.SessionState, error) {
-	historyPath, err := g.getLatestChatFile()
+	historyPath, err := g.findChatFile(workingDir)
 	if err != nil {
 		return domain.SessionState{}, fmt.Errorf("failed to find Gemini chat history: %w", err)
 	}
@@ -97,7 +149,8 @@ func (g *GeminiAdapter) Extract(workingDir string) (domain.SessionState, error) 
 	for scanner.Scan() {
 		line := scanner.Bytes()
 
-		if strings.HasPrefix(string(line), `{"$set"`) || strings.Contains(string(line), `"sessionId"`) {
+		// Skip metadata lines (first line and any state updates)
+		if strings.HasPrefix(string(line), `{"$set"`) || strings.Contains(string(line), `"sessionId"`) || strings.Contains(string(line), `"projectHash"`) {
 			continue
 		}
 
