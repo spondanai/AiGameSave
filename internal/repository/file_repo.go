@@ -15,44 +15,52 @@ const SaveFileName = ".aigamesave.yaml"
 // SaveSession writes the extracted session state to `.aigamesave.yaml`.
 func SaveSession(workingDir string, state domain.SessionState) error {
 	savePath := filepath.Join(workingDir, SaveFileName)
-	
+
 	data, err := yaml.Marshal(&state)
 	if err != nil {
 		return fmt.Errorf("failed to marshal state to YAML: %w", err)
 	}
 
-	err = os.WriteFile(savePath, data, 0644)
+	err = os.WriteFile(savePath, data, 0600)
 	if err != nil {
 		return fmt.Errorf("failed to write save file: %w", err)
 	}
 
-	// Auto-add to .gitignore if not present
-	EnsureGitIgnore(workingDir)
+	if err := ensureGitIgnore(workingDir); err != nil {
+		fmt.Printf("Warning: could not update .gitignore: %v\n", err)
+	}
 
 	return nil
 }
 
-// EnsureGitIgnore appends `.aigamesave.yaml` to `.gitignore` if it's not already there.
-func EnsureGitIgnore(workingDir string) {
+// ensureGitIgnore appends `.aigamesave.yaml` to `.gitignore` if it's not already there.
+func ensureGitIgnore(workingDir string) error {
 	ignorePath := filepath.Join(workingDir, ".gitignore")
 	content, err := os.ReadFile(ignorePath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			_ = os.WriteFile(ignorePath, []byte(SaveFileName+"\n"), 0644)
+			return os.WriteFile(ignorePath, []byte(SaveFileName+"\n"), 0644)
 		}
-		return
+		return err
 	}
 
-	if !strings.Contains(string(content), SaveFileName) {
-		f, err := os.OpenFile(ignorePath, os.O_APPEND|os.O_WRONLY, 0644)
-		if err == nil {
-			defer f.Close()
-			if !strings.HasSuffix(string(content), "\n") {
-				f.WriteString("\n")
-			}
-			f.WriteString(SaveFileName + "\n")
+	if strings.Contains(string(content), SaveFileName) {
+		return nil
+	}
+
+	f, err := os.OpenFile(ignorePath, os.O_APPEND|os.O_WRONLY, 0644)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	if !strings.HasSuffix(string(content), "\n") {
+		if _, err := f.WriteString("\n"); err != nil {
+			return err
 		}
 	}
+	_, err = f.WriteString(SaveFileName + "\n")
+	return err
 }
 
 // LoadSession reads `.aigamesave.yaml` and parses the state.

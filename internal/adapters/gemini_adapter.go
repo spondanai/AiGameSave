@@ -8,36 +8,47 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/spondanai/aigamesave/internal/domain"
 )
 
 // GeminiAdapter is the adapter for Gemini CLI.
-type GeminiAdapter struct{}
+// Gemini CLI stores history globally in ~/.gemini/tmp/*/chats/, not per-project.
+type GeminiAdapter struct {
+	cachedChatFile string
+}
 
 func NewGeminiAdapter() *GeminiAdapter {
 	return &GeminiAdapter{}
 }
 
-// getLatestChatFile finds the most recently modified .jsonl file across all ~/.gemini/tmp/*/chats/
-func (g *GeminiAdapter) getLatestChatFile(workingDir string) (string, error) {
+// getLatestChatFile finds the most recently modified .jsonl file across all ~/.gemini/tmp/*/chats/.
+// Result is cached to avoid redundant filesystem walks between Detect and Extract.
+func (g *GeminiAdapter) getLatestChatFile() (string, error) {
+	if g.cachedChatFile != "" {
+		return g.cachedChatFile, nil
+	}
+
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		return "", err
 	}
 
 	tmpDir := filepath.Join(homeDir, ".gemini", "tmp")
-	var files []string
 
-	// Walk through all directories in ~/.gemini/tmp
+	type fileInfo struct {
+		path    string
+		modTime time.Time
+	}
+	var files []fileInfo
+
 	err = filepath.Walk(tmpDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return nil // ignore permission errors
 		}
-		
-		// Only look for .jsonl files in a "chats" directory
 		if !info.IsDir() && strings.HasSuffix(info.Name(), ".jsonl") && filepath.Base(filepath.Dir(path)) == "chats" {
-			files = append(files, path)
+			files = append(files, fileInfo{path: path, modTime: info.ModTime()})
 		}
 		return nil
 	})
@@ -46,31 +57,24 @@ func (g *GeminiAdapter) getLatestChatFile(workingDir string) (string, error) {
 		return "", fmt.Errorf("no gemini chat files found in %s", tmpDir)
 	}
 
-	// Sort files by modification time (descending)
 	sort.Slice(files, func(i, j int) bool {
-		infoI, errI := os.Stat(files[i])
-		infoJ, errJ := os.Stat(files[j])
-		if errI != nil || errJ != nil {
-			return false
-		}
-		return infoI.ModTime().After(infoJ.ModTime())
+		return files[i].modTime.After(files[j].modTime)
 	})
 
-	return files[0], nil
+	g.cachedChatFile = files[0].path
+	return g.cachedChatFile, nil
 }
 
-// Detect checks if Gemini CLI is active by looking for a recent chat file.
-// Since Gemini CLI history is stored globally, we consider it "detected" if a recent file exists.
+// Detect checks if Gemini CLI has any recent chat history.
+// Note: Gemini stores history globally, so this is not scoped to workingDir.
 func (g *GeminiAdapter) Detect(workingDir string) bool {
-	_, err := g.getLatestChatFile(workingDir)
+	_, err := g.getLatestChatFile()
 	return err == nil
 }
 
-
 // Extract parses the Gemini CLI history file.
-// It extracts the last few turns and truncates long messages.
 func (g *GeminiAdapter) Extract(workingDir string) (domain.SessionState, error) {
-	historyPath, err := g.getLatestChatFile(workingDir)
+	historyPath, err := g.getLatestChatFile()
 	if err != nil {
 		return domain.SessionState{}, fmt.Errorf("failed to find Gemini chat history: %w", err)
 	}
@@ -83,20 +87,16 @@ func (g *GeminiAdapter) Extract(workingDir string) (domain.SessionState, error) 
 
 	var turns []domain.Turn
 	scanner := bufio.NewScanner(file)
+	scanner.Buffer(make([]byte, 1024*1024), 1024*1024)
 
-	// Represents the structure for Gemini CLI turns.
-	type ContentItem struct {
-		Text string `json:"text"`
-	}
 	type GeminiLine struct {
-		Type    string      `json:"type"` // "user" or "gemini"
-		Content interface{} `json:"content"` // can be string or []ContentItem
+		Type    string `json:"type"`
+		Content any    `json:"content"`
 	}
 
 	for scanner.Scan() {
 		line := scanner.Bytes()
-		
-		// Skip metadata or state lines
+
 		if strings.HasPrefix(string(line), `{"$set"`) || strings.Contains(string(line), `"sessionId"`) {
 			continue
 		}
@@ -112,10 +112,9 @@ func (g *GeminiAdapter) Extract(workingDir string) (domain.SessionState, error) 
 			switch v := gl.Content.(type) {
 			case string:
 				contentStr = v
-			case []interface{}:
-				// Handle array of objects (like the user message)
+			case []any:
 				for _, item := range v {
-					if obj, ok := item.(map[string]interface{}); ok {
+					if obj, ok := item.(map[string]any); ok {
 						if text, ok := obj["text"].(string); ok {
 							contentStr += text + "\n"
 						}
@@ -124,13 +123,14 @@ func (g *GeminiAdapter) Extract(workingDir string) (domain.SessionState, error) 
 			}
 
 			contentStr = strings.TrimSpace(contentStr)
-			if contentStr != "" {
-				// Prevent extremely long outputs from eating up context space
-				if len(contentStr) > 1500 {
-					contentStr = contentStr[:1500] + "\n... [Content truncated for brevity] ..."
-				}
-				turns = append(turns, domain.Turn{Role: role, Content: contentStr})
+			if contentStr == "" {
+				continue
 			}
+
+			if len(contentStr) > 1500 {
+				contentStr = contentStr[:1500] + "\n... [Content truncated for brevity] ..."
+			}
+			turns = append(turns, domain.Turn{Role: role, Content: contentStr})
 		}
 	}
 
@@ -138,18 +138,14 @@ func (g *GeminiAdapter) Extract(workingDir string) (domain.SessionState, error) 
 		return domain.SessionState{}, err
 	}
 
-	// Keep only the last 6 turns (3 pairs)
 	maxTurns := 6
 	if len(turns) > maxTurns {
 		turns = turns[len(turns)-maxTurns:]
 	}
 
-	return domain.SessionState{
-		RecentTurns: turns,
-	}, nil
+	return domain.SessionState{RecentTurns: turns}, nil
 }
 
 func (g *GeminiAdapter) Name() string {
 	return "Gemini CLI"
 }
-
