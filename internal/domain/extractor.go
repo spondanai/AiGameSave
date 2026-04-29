@@ -6,6 +6,7 @@ import "time"
 type SessionState struct {
 	RecentTurns []Turn
 	GitVision   []FileMetadata
+	Diff        string `yaml:",omitempty"` // Truncated git diff for context
 }
 
 // Turn represents a single interaction in the history.

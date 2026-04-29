@@ -44,3 +44,21 @@ func GetModifiedFiles(workingDir string) ([]domain.FileMetadata, error) {
 
 	return files, nil
 }
+
+// GetDiff runs `git diff HEAD` and returns the output truncated to maxBytes.
+// Returns an empty string if not a git repo or there is nothing to diff.
+func GetDiff(workingDir string, maxBytes int) string {
+	cmd := exec.Command("git", "diff", "HEAD")
+	cmd.Dir = workingDir
+
+	out, err := cmd.Output()
+	if err != nil || len(out) == 0 {
+		return ""
+	}
+
+	diff := string(out)
+	if len(diff) > maxBytes {
+		diff = diff[:maxBytes] + "\n... [diff truncated] ..."
+	}
+	return diff
+}
