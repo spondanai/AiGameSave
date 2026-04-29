@@ -142,14 +142,17 @@ type HistoryExtractor interface {
     Name() string
 }
 
-// Adapters should also implement:
+// Adapters should also implement activeAdapter so AGS can pick the
+// most recently active session when multiple CLIs coexist:
 type activeAdapter interface {
     LastActive(workingDir string) (time.Time, error)
 }
 
 type SessionState struct {
     RecentTurns []Turn
-    GitVision   []FileMetadata // populated by usecase, not your adapter
+    ActiveFiles []string       // populated by usecase (file-path extraction)
+    GitVision   []FileMetadata // populated by usecase (git status)
+    Diff        string         // populated by usecase (omitted if --no-diff)
 }
 
 type Turn struct {

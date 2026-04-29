@@ -4,9 +4,10 @@
 
 AiGameSave (AGS) acts like a "save point" for your AI coding sessions. It extracts your current context (recent conversation history + modified files) and saves it as a lightweight YAML file. When you start a new session, you can "load" this save to bring your AI up to speed instantly—**without wasting massive amounts of tokens re-scanning the entire project.**
 
-[![Go Version](https://img.shields.io/github/go-mod/go-version/mrporing/aigamesave)](https://go.dev/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](http://makeapullrequest.com)
+[![CI](https://github.com/spondanai/aigamesave/actions/workflows/ci.yml/badge.svg)](https://github.com/spondanai/aigamesave/actions/workflows/ci.yml)
+[![Go Version](https://img.shields.io/github/go-mod/go-version/spondanai/aigamesave)](https://go.dev/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
 ## ✨ Why AGS?
 
@@ -27,27 +28,29 @@ AGS solves this by:
 | **Claude Code** | `~/.claude/projects/<encoded-dir>/*.jsonl` |
 | **Gemini CLI** | `~/.gemini/tmp/<user>/chats/*.jsonl` (correlated by `projectHash`) |
 | **Codex** | `~/.codex/sessions/**/*.jsonl` (correlated by session `cwd`) |
-| **GitHub Copilot** (VS Code) | `~/Library/Application Support/Code/User/workspaceStorage/<hash>/chatSessions/*.json` |
+| **GitHub Copilot** (VS Code) | `workspaceStorage/<hash>/chatSessions/*.json` ¹ |
 | *Cline* | ⏳ Coming soon — PRs welcome |
 | *Cursor* | ⏳ Coming soon — PRs welcome |
+
+> ¹ Path resolves automatically for **macOS**, **Linux** (`$XDG_CONFIG_HOME`), and **Windows** (`%APPDATA%`).
 
 ---
 
 ## 📦 Installation
 
-Ensure you have Go installed, then run:
+### Requires Go 1.22+
 
 ```bash
 go install github.com/spondanai/aigamesave/cmd/ags@latest
 ```
 
-AGS checks for newer versions when you run `ags save` or `ags load`. If an update is available:
+AGS checks for newer versions in the background when you run `ags save` or `ags load`. If an update is available:
 
 ```bash
 ags self-update
 ```
 
-For offline or CI usage, disable the check with `AGS_SKIP_UPDATE_CHECK=1`.
+For offline or CI usage, set `AGS_SKIP_UPDATE_CHECK=1` to disable the check.
 
 ---
 
@@ -55,47 +58,75 @@ For offline or CI usage, disable the check with `AGS_SKIP_UPDATE_CHECK=1`.
 
 ### 1. Save Your Game
 
-Before ending your session, run:
+Before ending your session (or when the AI seems to be losing context), run:
 
 ```bash
 ags save
 ```
 
-AGS detects your active AI CLI, extracts conversation context, runs a Git vision check to find modified files, redacts secrets, and saves everything into a `.aigamesave.yaml` file (automatically added to `.gitignore`).
+AGS will:
+1. Auto-detect your active AI CLI (picks the one with the most recent session)
+2. Extract conversation history using **Smart Anchor Search** (see below)
+3. Run `git status` to find files currently being worked on
+4. Redact any secrets found in the content
+5. Save everything to `.aigamesave.yaml` (auto-added to `.gitignore`)
 
-**Context selection:** AGS does not blindly grab the last N turns. It backward-searches for your last meaningful instruction (≥10 characters), then keeps that anchor plus the most recent work the AI did afterwards. Short acknowledgements like "ok" or "ลองรันดู" are skipped so the anchor stays on your actual goal.
+**Smart Anchor Search:** AGS backward-searches for your last meaningful instruction (≥10 characters) and uses it as an "anchor". It then keeps that anchor plus the most recent 5 turns after it. Short acknowledgements like "ok", "sure", or "ลองรันดู" are skipped so the anchor stays on your actual goal — not agentic self-talk.
 
-If you use multiple AI CLIs in the same project, AGS picks the one with the most recently active session. Override manually:
+**Override flags:**
 
 ```bash
+# Force a specific adapter
 ags save --adapter codex
 ags save --adapter gemini
 ags save --adapter claude
 ags save --adapter copilot
+
+# Skip embedding the git diff (saves tokens for large repos)
+ags save --no-diff
 ```
 
-Short aliases work too: `--adapter github` or `--adapter githubcopilot` also resolve to GitHub Copilot.
+Short aliases work too: `--adapter github` or `--adapter githubcopilot` both resolve to GitHub Copilot.
 
 ### 2. Load Your Game
 
-When you return, run:
+When you return (or switch to a new AI session), run:
 
 ```bash
 ags load
 ```
 
-AGS reads the save file, formats a concise prompt, and **copies it directly to your clipboard**. Paste it into your AI CLI and say: *"Let's continue."*
+AGS reads `.aigamesave.yaml`, formats a concise resume prompt, and **copies it directly to your clipboard**. Paste it into your AI and say: *"Let's continue."*
 
-Use `ags load --stdout` to pipe the output instead of copying to clipboard.
+The output includes:
+- `## Recent context` — anchor turn + recent AI work
+- `## Active files` — files mentioned in conversation (verified to exist on disk)
+- `## Files being worked on` — git-status modified/untracked files
+- `## Current diff` — `git diff HEAD` (truncated to 3 000 bytes, unless `--no-diff` was used on save)
+
+```bash
+# Print to stdout instead of clipboard (useful for piping)
+ags load --stdout
+```
 
 ---
 
 ## 🛠️ How It Works
 
-1. **Detect Adapter** — Scans for known AI history files; picks the one touched most recently.
-2. **Anchor & Extract** — Finds the last substantial user instruction, keeps that + the most recent 5 turns after it.
-3. **Git Vision** — Runs `git status --porcelain` to identify files currently being worked on.
-4. **Redact & Save** — Strips common secret patterns, then writes `.aigamesave.yaml`.
+```
+ags save
+  │
+  ├─ Detect Adapter ──── Scans for known AI history files; picks the one touched most recently
+  ├─ Anchor & Extract ── Finds the last substantial user instruction + last 5 turns after it
+  ├─ File Context ─────── Regex-extracts file paths from conversation; verifies they exist on disk
+  ├─ Git Vision ────────── git status --porcelain → ranks files by recency + mention count
+  ├─ Redact ────────────── Strips common secret patterns (API keys, tokens)
+  └─ Save ──────────────── Writes .aigamesave.yaml
+
+ags load
+  │
+  └─ Reads .aigamesave.yaml → formats resume prompt → clipboard (or stdout)
+```
 
 ---
 
@@ -104,8 +135,8 @@ Use `ags load --stdout` to pipe the output instead of copying to clipboard.
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the full guide. The short version:
 
 1. Create `internal/adapters/<name>_adapter.go` and implement `HistoryExtractor`.
-2. Add your adapter to `registry.go`.
-3. Call `selectContext(turns)` (from `context.go`) instead of slicing turns manually.
+2. Add your adapter to `registry.go` (one line).
+3. Call `selectContext(turns)` — never slice turns manually.
 4. Open a PR. 🎉
 
 ### Good First Issues
