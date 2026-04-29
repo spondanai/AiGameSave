@@ -81,10 +81,12 @@ func SaveGameWithOptions(workingDir string, opts SaveOptions) error {
 }
 
 // filterExistingPaths returns only paths that resolve to real files under workingDir.
+// Paths are stored with forward slashes; filepath.FromSlash converts them to the
+// OS-native separator before os.Stat so the check works correctly on Windows.
 func filterExistingPaths(workingDir string, paths []string) []string {
 	var result []string
 	for _, p := range paths {
-		abs := filepath.Join(workingDir, p)
+		abs := filepath.Join(workingDir, filepath.FromSlash(p))
 		info, err := os.Stat(abs)
 		if err == nil && !info.IsDir() {
 			result = append(result, p)

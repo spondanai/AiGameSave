@@ -60,6 +60,42 @@ func TestExtractFilePaths_SkipsVersionStrings(t *testing.T) {
 	}
 }
 
+func TestExtractFilePaths_WindowsBackslash(t *testing.T) {
+	turns := []Turn{
+		{Role: "assistant", Content: `แก้ internal\adapters\registry.go และ cmd\ags\main.go แล้ว`},
+	}
+	paths := ExtractFilePaths(turns)
+
+	want := map[string]bool{
+		"internal/adapters/registry.go": true,
+		"cmd/ags/main.go":               true,
+	}
+	for _, p := range paths {
+		if !want[p] {
+			t.Errorf("unexpected path: %q", p)
+		}
+		delete(want, p)
+	}
+	for missing := range want {
+		t.Errorf("missing path: %q", missing)
+	}
+}
+
+func TestExtractFilePaths_NormalizesBackslashForDedup(t *testing.T) {
+	// Same file mentioned once with / and once with \  — should deduplicate to one entry.
+	turns := []Turn{
+		{Role: "user", Content: `internal/adapters/context.go`},
+		{Role: "assistant", Content: `internal\adapters\context.go อัปเดตแล้ว`},
+	}
+	paths := ExtractFilePaths(turns)
+	if len(paths) != 1 {
+		t.Errorf("expected 1 deduplicated path, got %d: %v", len(paths), paths)
+	}
+	if len(paths) == 1 && paths[0] != "internal/adapters/context.go" {
+		t.Errorf("expected forward-slash path, got %q", paths[0])
+	}
+}
+
 func TestLooksLikeDomain(t *testing.T) {
 	cases := []struct {
 		path string
@@ -69,6 +105,8 @@ func TestLooksLikeDomain(t *testing.T) {
 		{"pkg.go.dev/foo/bar", true},
 		{"internal/adapters/context.go", false},
 		{"cmd/ags/main.go", false},
+		{`github.com\foo\bar.go`, true},   // backslash variant
+		{`internal\adapters\context.go`, false},
 	}
 	for _, c := range cases {
 		if got := looksLikeDomain(c.path); got != c.want {

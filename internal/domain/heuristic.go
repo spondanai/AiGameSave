@@ -6,14 +6,14 @@ import (
 	"strings"
 )
 
-// filePathRe matches relative file paths that contain at least one "/" directory
-// separator and end with a file extension. Requires the path to start with a
+// filePathRe matches relative file paths that contain at least one directory
+// separator (/ or \) and end with a file extension. The path must start with a
 // letter so that version strings like "1.2.3/..." are not captured.
-var filePathRe = regexp.MustCompile(`[a-zA-Z][a-zA-Z0-9_.%-]*/[a-zA-Z0-9_.%-][a-zA-Z0-9_./%-]*\.[a-zA-Z][a-zA-Z0-9]{0,11}`)
+var filePathRe = regexp.MustCompile(`[a-zA-Z][a-zA-Z0-9_.%-]*[/\\][a-zA-Z0-9_.%-][a-zA-Z0-9_./\\%-]*\.[a-zA-Z][a-zA-Z0-9]{0,11}`)
 
 // ExtractFilePaths scans conversation turns for file path patterns and returns
-// a deduplicated, ordered list. The caller is responsible for filtering paths
-// that do not exist on disk.
+// a deduplicated, ordered list with forward-slash separators. The caller is
+// responsible for filtering paths that do not exist on disk.
 func ExtractFilePaths(turns []Turn) []string {
 	seen := make(map[string]struct{})
 	var result []string
@@ -24,9 +24,12 @@ func ExtractFilePaths(turns []Turn) []string {
 			if strings.Contains(raw, "://") || looksLikeDomain(raw) {
 				continue
 			}
-			if _, ok := seen[raw]; !ok {
-				seen[raw] = struct{}{}
-				result = append(result, raw)
+			// Normalize to forward slashes so deduplication and YAML storage
+			// are consistent regardless of which OS produced the conversation.
+			normalized := strings.ReplaceAll(raw, `\`, "/")
+			if _, ok := seen[normalized]; !ok {
+				seen[normalized] = struct{}{}
+				result = append(result, normalized)
 			}
 		}
 	}
@@ -35,9 +38,13 @@ func ExtractFilePaths(turns []Turn) []string {
 
 // looksLikeDomain returns true when the first path component contains a dot,
 // which indicates a hostname like "github.com" rather than a local directory.
+// Handles both / and \ separators.
 func looksLikeDomain(path string) bool {
-	host, _, ok := strings.Cut(path, "/")
-	return ok && strings.Contains(host, ".")
+	idx := strings.IndexAny(path, `/\`)
+	if idx < 0 {
+		return false
+	}
+	return strings.Contains(path[:idx], ".")
 }
 
 const (
