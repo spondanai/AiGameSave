@@ -51,19 +51,21 @@ func GetModifiedFiles(workingDir string) ([]domain.FileMetadata, error) {
 // the content of untracked files (from `git ls-files --others --exclude-standard`).
 // Total output is truncated to maxBytes.
 func GetDiff(workingDir string, maxBytes int) string {
+	if maxBytes <= 0 {
+		return ""
+	}
+
 	var sb strings.Builder
+	truncated := false
 
 	// Tracked changes
-	if out, err := runGit(workingDir, "diff", "HEAD"); err == nil && len(out) > 0 {
-		if len(out) > maxBytes {
-			sb.Write(out[:maxBytes])
-		} else {
-			sb.Write(out)
-		}
+	if out, wasTruncated, err := runGitLimited(workingDir, maxBytes, "diff", "HEAD"); err == nil && len(out) > 0 {
+		sb.Write(out)
+		truncated = wasTruncated
 	}
 
 	// Untracked files — include their full content so new-file sessions are not context-blind
-	if sb.Len() < maxBytes {
+	if !truncated && sb.Len() < maxBytes {
 		if out, err := runGit(workingDir, "ls-files", "--others", "--exclude-standard"); err == nil {
 			for rel := range strings.SplitSeq(strings.TrimSpace(string(out)), "\n") {
 				if rel == "" {
@@ -124,11 +126,41 @@ func GetDiff(workingDir string, maxBytes int) string {
 	if len(diff) == 0 {
 		return ""
 	}
-	if len(diff) >= maxBytes {
-		// Because we cap appending, it might be exactly maxBytes
+	if truncated || len(diff) >= maxBytes {
 		return diff[:maxBytes] + "\n... [diff truncated] ..."
 	}
 	return diff
+}
+
+func runGitLimited(workingDir string, maxBytes int, args ...string) ([]byte, bool, error) {
+	cmd := exec.Command("git", args...)
+	cmd.Dir = workingDir
+
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		return nil, false, err
+	}
+	if err := cmd.Start(); err != nil {
+		return nil, false, err
+	}
+
+	out, readErr := io.ReadAll(io.LimitReader(stdout, int64(maxBytes+1)))
+	wasTruncated := len(out) > maxBytes
+	if wasTruncated && cmd.Process != nil {
+		_ = cmd.Process.Kill()
+	}
+	waitErr := cmd.Wait()
+	if readErr != nil {
+		return nil, false, readErr
+	}
+	if waitErr != nil && !wasTruncated {
+		return nil, false, waitErr
+	}
+
+	if wasTruncated {
+		return out[:maxBytes], true, nil
+	}
+	return out, false, nil
 }
 
 func runGit(workingDir string, args ...string) ([]byte, error) {

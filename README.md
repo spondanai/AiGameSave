@@ -22,6 +22,7 @@ AGS solves this by:
 - ✅ **Aider** (`.aider.chat.history.md`)
 - ✅ **Claude Code** (`~/.claude/projects/<encoded-dir>/*.jsonl`)
 - ✅ **Gemini CLI** (`~/.gemini/tmp/<user>/chats/*.jsonl`, correlated by `projectHash`)
+- ✅ **Codex** (`~/.codex/sessions/**/*.jsonl`, correlated by session `cwd`)
 - ⏳ *Cline (Coming Soon - PRs welcome!)*
 - ⏳ *Cursor (Coming Soon)*
 

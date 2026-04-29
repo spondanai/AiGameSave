@@ -16,7 +16,7 @@ type activeAdapter interface {
 func init() {
 	// Register known adapters here.
 	// In the future, we can iterate over these dynamically.
-	registry = append(registry, NewAiderAdapter(), NewClaudeAdapter(), NewGeminiAdapter())
+	registry = append(registry, NewAiderAdapter(), NewClaudeAdapter(), NewGeminiAdapter(), NewCodexAdapter())
 }
 
 // DetectActiveAdapter chooses the matching adapter with the most recently
