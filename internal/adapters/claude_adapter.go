@@ -65,6 +65,18 @@ func (c *ClaudeAdapter) Detect(workingDir string) bool {
 	return findClaudeProjectDir(workingDir) != ""
 }
 
+func (c *ClaudeAdapter) LastActive(workingDir string) (time.Time, error) {
+	sessionPath, err := c.getLatestSession(workingDir)
+	if err != nil {
+		return time.Time{}, err
+	}
+	info, err := os.Stat(sessionPath)
+	if err != nil {
+		return time.Time{}, err
+	}
+	return info.ModTime(), nil
+}
+
 // getLatestSession returns the path to the most recently modified session file.
 func (c *ClaudeAdapter) getLatestSession(workingDir string) (string, error) {
 	projectDir := findClaudeProjectDir(workingDir)

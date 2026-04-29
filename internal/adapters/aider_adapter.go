@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/spondanai/aigamesave/internal/domain"
 )
@@ -23,11 +24,20 @@ func (a *AiderAdapter) Detect(workingDir string) bool {
 	return err == nil
 }
 
+func (a *AiderAdapter) LastActive(workingDir string) (time.Time, error) {
+	historyPath := filepath.Join(workingDir, ".aider.chat.history.md")
+	info, err := os.Stat(historyPath)
+	if err != nil {
+		return time.Time{}, err
+	}
+	return info.ModTime(), nil
+}
+
 // Extract parses the `.aider.chat.history.md` file.
 // It extracts the last 3 turns (USER/ASSISTANT pairs) and truncates long code blocks.
 func (a *AiderAdapter) Extract(workingDir string) (domain.SessionState, error) {
 	historyPath := filepath.Join(workingDir, ".aider.chat.history.md")
-	
+
 	file, err := os.Open(historyPath)
 	if err != nil {
 		return domain.SessionState{}, err
@@ -109,4 +119,3 @@ func (a *AiderAdapter) Extract(workingDir string) (domain.SessionState, error) {
 func (a *AiderAdapter) Name() string {
 	return "Aider"
 }
-

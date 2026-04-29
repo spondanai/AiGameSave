@@ -124,6 +124,18 @@ func (g *GeminiAdapter) Detect(workingDir string) bool {
 	return err == nil
 }
 
+func (g *GeminiAdapter) LastActive(workingDir string) (time.Time, error) {
+	historyPath, err := g.findChatFile(workingDir)
+	if err != nil {
+		return time.Time{}, err
+	}
+	info, err := os.Stat(historyPath)
+	if err != nil {
+		return time.Time{}, err
+	}
+	return info.ModTime(), nil
+}
+
 // Extract parses the correlated Gemini CLI session file.
 func (g *GeminiAdapter) Extract(workingDir string) (domain.SessionState, error) {
 	historyPath, err := g.findChatFile(workingDir)
