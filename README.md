@@ -36,6 +36,15 @@ Ensure you have Go installed, then run:
 go install github.com/spondanai/aigamesave/cmd/ags@latest
 ```
 
+AGS checks for newer versions when you run `ags save` or `ags load`. If a newer
+adapter update is available, update with:
+
+```bash
+ags self-update
+```
+
+For offline or CI usage, disable the check with `AGS_SKIP_UPDATE_CHECK=1`.
+
 ## 🎮 Usage
 
 ### 1. Save Your Game
