@@ -1,4 +1,4 @@
-module github.com/mrporing/aigamesave
+module github.com/spondanai/AiGameSave
 
 go 1.25.4
 

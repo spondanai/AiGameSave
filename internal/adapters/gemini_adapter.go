@@ -9,7 +9,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/mrporing/aigamesave/internal/domain"
+	"github.com/spondanai/AiGameSave/internal/domain"
 )
 
 // GeminiAdapter is the adapter for Gemini CLI.

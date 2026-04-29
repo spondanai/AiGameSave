@@ -5,7 +5,7 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
-	"github.com/mrporing/aigamesave/internal/usecase"
+	"github.com/spondanai/AiGameSave/internal/usecase"
 )
 
 var rootCmd = &cobra.Command{

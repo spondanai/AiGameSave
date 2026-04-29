@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/mrporing/aigamesave/internal/domain"
+	"github.com/spondanai/AiGameSave/internal/domain"
 )
 
 // ClaudeAdapter is the adapter for Claude Code AI CLI.

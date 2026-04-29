@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/mrporing/aigamesave/internal/domain"
+	"github.com/spondanai/AiGameSave/internal/domain"
 )
 
 // AiderAdapter is the adapter for Aider AI CLI.

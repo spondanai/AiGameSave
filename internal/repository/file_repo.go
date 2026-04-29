@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"gopkg.in/yaml.v3"
-	"github.com/mrporing/aigamesave/internal/domain"
+	"github.com/spondanai/AiGameSave/internal/domain"
 )
 
 const SaveFileName = ".aigamesave.yaml"

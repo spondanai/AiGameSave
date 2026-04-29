@@ -32,7 +32,7 @@ AGS solves this by:
 Ensure you have Go installed, then run:
 
 ```bash
-go install github.com/mrporing/aigamesave/cmd/ags@latest
+go install github.com/spondanai/AiGameSave/cmd/ags@latest
 ```
 
 ## 🎮 Usage
@@ -82,7 +82,7 @@ AGS is built with a **Registry Pattern**, making it incredibly easy for anyone t
    ```go
    package adapters
    
-   import "github.com/mrporing/aigamesave/internal/domain"
+   import "github.com/spondanai/AiGameSave/internal/domain"
 
    type MyAIAdapter struct{}
 
@@ -121,7 +121,7 @@ AGS is built with a **Registry Pattern**, making it incredibly easy for anyone t
 4. **Submit a PR!** 🎉
 
 ### Good First Issues
-If you are looking to contribute, check our [Issues](https://github.com/mrporing/aigamesave/issues) tab. We are actively looking for help building adapters for **Cline**, **Cursor**, and improving our **Git Ranking Heuristics**.
+If you are looking to contribute, check our [Issues](https://github.com/spondanai/AiGameSave/issues) tab. We are actively looking for help building adapters for **Cline**, **Cursor**, and improving our **Git Ranking Heuristics**.
 
 ---
 
