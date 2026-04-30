@@ -102,6 +102,7 @@ AGS reads `.aigamesave.yaml`, formats a concise resume prompt, and **copies it d
 
 The output includes:
 - `## Recent context` — anchor turn + recent AI work
+- `## Pending plan` — unfinished tasks automatically extracted from the AI's internal task manager (currently supports Claude Code's `TodoWrite`)
 - `## Active files` — files mentioned in conversation (verified to exist on disk)
 - `## Files being worked on` — git-status modified/untracked files
 - `## Current diff` — `git diff HEAD` (truncated to 3 000 bytes, unless `--no-diff` was used on save)
@@ -120,6 +121,7 @@ ags save
   │
   ├─ Detect Adapter ──── Scans for known AI history files; picks the one touched most recently
   ├─ Anchor & Extract ── Finds the last substantial user instruction + last 5 turns after it
+  ├─ Plan Extraction ─── (Claude only) Extracts uncompleted tasks from internal tool calls
   ├─ File Context ─────── Regex-extracts file paths from conversation; verifies they exist on disk
   ├─ Git Vision ────────── git status --porcelain → ranks files by recency + mention count
   ├─ Ignore Filter ─────── Applies .aigamesaveignore rules to GitVision + ActiveFiles
