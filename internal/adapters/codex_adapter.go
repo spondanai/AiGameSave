@@ -40,11 +40,12 @@ func codexCandidateDirs(workingDir string) map[string]struct{} {
 
 	dir := filepath.Clean(workingDir)
 	for {
-		if dir == homeDir || dir == "/" || dir == "." {
+		parent := filepath.Dir(dir)
+		if dir == homeDir || dir == "/" || dir == "." || parent == dir {
 			break
 		}
 		dirs[dir] = struct{}{}
-		dir = filepath.Dir(dir)
+		dir = parent
 	}
 	return dirs
 }

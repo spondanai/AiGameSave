@@ -41,10 +41,11 @@ func candidateHashes(workingDir string) map[string]struct{} {
 	dir := workingDir
 	for {
 		hashes[projectHash(dir)] = struct{}{}
-		if dir == homeDir || dir == "/" || dir == "." {
+		parent := filepath.Dir(dir)
+		if dir == homeDir || dir == "/" || dir == "." || parent == dir {
 			break
 		}
-		dir = filepath.Dir(dir)
+		dir = parent
 	}
 	return hashes
 }

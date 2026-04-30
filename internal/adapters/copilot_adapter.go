@@ -71,10 +71,11 @@ func findWorkspaceStorageDir(workingDir string) string {
 	dir := filepath.Clean(workingDir)
 	for {
 		candidates[dir] = struct{}{}
-		if dir == homeDir || dir == "/" || dir == "." {
+		parent := filepath.Dir(dir)
+		if dir == homeDir || dir == "/" || dir == "." || parent == dir {
 			break
 		}
-		dir = filepath.Dir(dir)
+		dir = parent
 	}
 
 	var best struct {
