@@ -19,7 +19,9 @@ AGS solves this by:
 - **Zero Token Cost:** Uses 100% local Go logic (Git + file parsing). No API calls. Benchmarks show **~99% token reduction** vs raw session files ([see BENCHMARK.md](BENCHMARK.md)).
 - **Instruction Anchoring:** Backward-searches for your last meaningful instruction so agentic self-talk can't evict it.
 - **Smart Truncation:** Automatically truncates massive code blocks and terminal outputs from the history.
+- **Noise-free Diff:** Lock files and generated assets (`go.sum`, `package-lock.json`, `yarn.lock`, etc.) are excluded from the diff automatically, so the token budget goes to real source changes.
 - **Auto-Redaction:** Sanitises common API keys before saving to prevent accidental leaks.
+- **Cross-platform:** Works on macOS, Linux, and Windows (including projects on non-home drives like `D:\`).
 - **Plug-and-Play Architecture:** Incredibly easy to add support for new AI CLIs.
 
 ## 🚀 Supported AI CLIs
@@ -105,7 +107,7 @@ The output includes:
 - `## Pending plan` — unfinished tasks automatically extracted from the AI's internal task manager (currently supports Claude Code's `TodoWrite`)
 - `## Active files` — files mentioned in conversation (verified to exist on disk)
 - `## Files being worked on` — git-status modified/untracked files
-- `## Current diff` — `git diff HEAD` (truncated to 3 000 bytes, unless `--no-diff` was used on save)
+- `## Current diff` — `git diff HEAD` with lock files and generated assets excluded automatically; truncated to 3 000 bytes (unless `--no-diff` was used on save)
 
 ```bash
 # Print to stdout instead of clipboard (useful for piping)
@@ -121,9 +123,11 @@ ags save
   │
   ├─ Detect Adapter ──── Scans for known AI history files; picks the one touched most recently
   ├─ Anchor & Extract ── Finds the last substantial user instruction + last 5 turns after it
+  ├─ Noise Strip ──────── Removes repetitive blocks (e.g. Cline's <environment_details>)
   ├─ Plan Extraction ─── (Claude only) Extracts uncompleted tasks from internal tool calls
   ├─ File Context ─────── Regex-extracts file paths from conversation; verifies they exist on disk
   ├─ Git Vision ────────── git status --porcelain → ranks files by recency + mention count
+  ├─ Diff Filter ──────── Excludes lock files & generated assets; truncates to 3 000 bytes
   ├─ Ignore Filter ─────── Applies .aigamesaveignore rules to GitVision + ActiveFiles
   ├─ Redact ────────────── Strips common secret patterns (API keys, tokens)
   └─ Save ──────────────── Writes .aigamesave.yaml
@@ -172,7 +176,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the full guide. The short version:
 4. Open a PR. 🎉
 
 ### Good First Issues
-Check the [Issues tab](https://github.com/spondanai/aigamesave/issues). We are actively looking for adapters for **Cline** and **Cursor**.
+Check the [Issues tab](https://github.com/spondanai/aigamesave/issues). We are actively looking for an adapter for **Cursor**.
 
 ---
 
