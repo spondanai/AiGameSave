@@ -1,2 +1,5 @@
 .aigamesave.yaml
 bin/
+*.exe
+.DS_Store
+*.out
