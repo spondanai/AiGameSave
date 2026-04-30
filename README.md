@@ -29,7 +29,7 @@ AGS solves this by:
 | **Gemini CLI** | `~/.gemini/tmp/<user>/chats/*.jsonl` (correlated by `projectHash`) |
 | **Codex** | `~/.codex/sessions/**/*.jsonl` (correlated by session `cwd`) |
 | **GitHub Copilot** (VS Code) | `workspaceStorage/<hash>/chatSessions/*.json` ¹ |
-| *Cline* | ⏳ Coming soon — PRs welcome |
+| **Cline** (VS Code) | `globalStorage/saoudrizwan.claude-dev/tasks/<ts>/api_conversation_history.json` ¹ |
 | *Cursor* | ⏳ Coming soon — PRs welcome |
 
 > ¹ Path resolves automatically for **macOS**, **Linux** (`$XDG_CONFIG_HOME`), and **Windows** (`%APPDATA%`).

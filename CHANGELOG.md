@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Cline adapter** — reads `api_conversation_history.json` from VS Code's `globalStorage/saoudrizwan.claude-dev/tasks/`. The most recent task whose embedded `Current Working Directory` matches the project (or any parent) is selected automatically. Cross-platform: macOS, Linux (`$XDG_CONFIG_HOME`), and Windows (`%APPDATA%`).
+
 ---
 
 ## [0.3.0] — 2026-04-29
