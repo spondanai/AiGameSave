@@ -9,6 +9,8 @@ AiGameSave (AGS) acts like a "save point" for your AI coding sessions. It extrac
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
+![AGS demo](demo.gif)
+
 ## ✨ Why AGS?
 
 AI coding assistants are powerful, but starting a new session often means losing context—or spending dollars on input tokens just to re-read the workspace map. In agentic workflows this gets worse: the AI's own self-talk (running commands, checking logs, summarising results) can push your original instruction clean out of the context window.
