@@ -105,8 +105,14 @@ func (a *AiderAdapter) Extract(workingDir string) (domain.SessionState, error) {
 		return domain.SessionState{}, err
 	}
 
+	var rawBytes int64
+	if info, err := os.Stat(historyPath); err == nil {
+		rawBytes = info.Size()
+	}
+
 	return domain.SessionState{
 		RecentTurns: selectContext(turns),
+		RawBytes:    rawBytes,
 	}, nil
 }
 

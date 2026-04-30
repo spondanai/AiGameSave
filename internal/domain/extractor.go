@@ -8,6 +8,9 @@ type SessionState struct {
 	ActiveFiles []string       `yaml:"activefiles,omitempty"`
 	GitVision   []FileMetadata
 	Diff        string         `yaml:",omitempty"`
+	// RawBytes is the byte size of the original session source file(s) before
+	// AGS processing. Used to report token savings. Not persisted to YAML.
+	RawBytes int64 `yaml:"-"`
 }
 
 // Turn represents a single interaction in the history.

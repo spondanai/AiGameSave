@@ -208,7 +208,12 @@ func (c *ClaudeAdapter) Extract(workingDir string) (domain.SessionState, error) 
 		turns = append(turns, domain.Turn{Role: cl.Type, Content: content})
 	}
 
-	return domain.SessionState{RecentTurns: selectContext(turns)}, nil
+	var rawBytes int64
+	if info, err := os.Stat(sessionPath); err == nil {
+		rawBytes = info.Size()
+	}
+
+	return domain.SessionState{RecentTurns: selectContext(turns), RawBytes: rawBytes}, nil
 }
 
 func (c *ClaudeAdapter) Name() string {

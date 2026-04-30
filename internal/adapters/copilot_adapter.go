@@ -19,7 +19,9 @@ import (
 //   - macOS:   ~/Library/Application Support/Code/User/workspaceStorage/<hash>/chatSessions/*.json
 //   - Linux:   ~/.config/Code/User/workspaceStorage/...
 //   - Windows: %APPDATA%\Code\User\workspaceStorage\...
-type CopilotAdapter struct{}
+type CopilotAdapter struct {
+	cachedPath string
+}
 
 func NewCopilotAdapter() *CopilotAdapter {
 	return &CopilotAdapter{}
@@ -190,6 +192,7 @@ func (c *CopilotAdapter) latestSession(workingDir string) (*copilotSession, erro
 		return candidates[i].lastMessageDate > candidates[j].lastMessageDate
 	})
 
+	c.cachedPath = candidates[0].path
 	data, err := os.ReadFile(candidates[0].path)
 	if err != nil {
 		return nil, err
@@ -244,7 +247,14 @@ func (c *CopilotAdapter) Extract(workingDir string) (domain.SessionState, error)
 		}
 	}
 
-	return domain.SessionState{RecentTurns: selectContext(turns)}, nil
+	var rawBytes int64
+	if c.cachedPath != "" {
+		if info, err := os.Stat(c.cachedPath); err == nil {
+			rawBytes = info.Size()
+		}
+	}
+
+	return domain.SessionState{RecentTurns: selectContext(turns), RawBytes: rawBytes}, nil
 }
 
 func (c *CopilotAdapter) Name() string {

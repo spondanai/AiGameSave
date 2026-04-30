@@ -198,7 +198,12 @@ func (c *CodexAdapter) Extract(workingDir string) (domain.SessionState, error) {
 		turns = append(turns, turn)
 	}
 
-	return domain.SessionState{RecentTurns: selectContext(turns)}, nil
+	var rawBytes int64
+	if info, err := os.Stat(sessionPath); err == nil {
+		rawBytes = info.Size()
+	}
+
+	return domain.SessionState{RecentTurns: selectContext(turns), RawBytes: rawBytes}, nil
 }
 
 func parseCodexTurn(line []byte) (domain.Turn, bool) {

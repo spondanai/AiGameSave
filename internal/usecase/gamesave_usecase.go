@@ -82,7 +82,62 @@ func SaveGameWithOptions(workingDir string, opts SaveOptions) error {
 	}
 
 	fmt.Println("Successfully saved session to .aigamesave.yaml")
+	printTokenSavings(state)
 	return nil
+}
+
+// printTokenSavings reports how many tokens the resume prompt saves vs the raw
+// session file. Uses 4 bytes-per-token as a conservative approximation.
+func printTokenSavings(state domain.SessionState) {
+	if state.RawBytes == 0 {
+		return
+	}
+	resumeBytes := int64(len([]byte(formatResumePrompt(state))))
+	rawTokens := state.RawBytes / 4
+	resumeTokens := resumeBytes / 4
+	saved := rawTokens - resumeTokens
+	if saved <= 0 {
+		return
+	}
+	pct := (state.RawBytes - resumeBytes) * 100 / state.RawBytes
+	fmt.Printf("Token savings: ~%s tokens saved vs raw session (%d%% reduction)\n",
+		formatTokenCount(saved), pct)
+}
+
+func formatTokenCount(n int64) string {
+	if n >= 1000 {
+		return fmt.Sprintf("%dk", n/1000)
+	}
+	return fmt.Sprintf("%d", n)
+}
+
+// formatResumePrompt builds the same resume prompt that LoadGame would produce,
+// so we can measure its size at save time.
+func formatResumePrompt(state domain.SessionState) string {
+	var sb strings.Builder
+	sb.WriteString("Resume Session:\n\n## Recent context\n")
+	for _, turn := range state.RecentTurns {
+		fmt.Fprintf(&sb, "[%s]: %s\n", turn.Role, turn.Content)
+	}
+	if len(state.ActiveFiles) > 0 {
+		sb.WriteString("\n## Active files (mentioned in conversation)\n")
+		for _, p := range state.ActiveFiles {
+			fmt.Fprintf(&sb, "- %s\n", p)
+		}
+	}
+	if len(state.GitVision) > 0 {
+		sb.WriteString("\n## Files being worked on (git status)\n")
+		for _, file := range state.GitVision {
+			fmt.Fprintf(&sb, "- %s [%s]\n", file.Path, file.Status)
+		}
+	}
+	if state.Diff != "" {
+		sb.WriteString("\n## Current diff (HEAD)\n```diff\n")
+		sb.WriteString(state.Diff)
+		sb.WriteString("\n```\n")
+	}
+	sb.WriteString("\nPlease continue the work based on this context.\n")
+	return sb.String()
 }
 
 // filterIgnored removes FileMetadata entries whose paths match ignoreRules.
