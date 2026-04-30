@@ -34,7 +34,12 @@ AGS solves this by:
 | **Codex** | `~/.codex/sessions/**/*.jsonl` (correlated by session `cwd`) |
 | **GitHub Copilot** (VS Code) | `workspaceStorage/<hash>/chatSessions/*.json` ¹ |
 | **Cline** (VS Code) | `globalStorage/saoudrizwan.claude-dev/tasks/<ts>/api_conversation_history.json` ¹ |
-| *Cursor* | ⏳ Coming soon — PRs welcome |
+| *Cursor* | ⏳ Coming soon — `workspaceStorage/<hash>/state.vscdb` (SQLite) ¹ |
+| *Roo Code* (VS Code) | ⏳ Coming soon — `globalStorage/rooveterinaryinc.roo-cline/tasks/<ts>/api_conversation_history.json` ¹ |
+| *Continue* (VS Code / JetBrains) | ⏳ Coming soon — `~/.continue/sessions/<session-id>.json` |
+| *Windsurf* | ⏳ Coming soon — `globalStorage/codeium.windsurf/` (SQLite) ¹ |
+| *Amazon Q Developer* | ⏳ Coming soon — `~/.local/share/amazon-q/` or `~/.aws/amazonq/` |
+| *Zed AI* | ⏳ Coming soon — `~/.config/zed/conversations/*.md` (macOS/Linux only) |
 
 > ¹ Path resolves automatically for **macOS**, **Linux** (`$XDG_CONFIG_HOME`), and **Windows** (`%APPDATA%`).
 
@@ -176,7 +181,16 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the full guide. The short version:
 4. Open a PR. 🎉
 
 ### Good First Issues
-Check the [Issues tab](https://github.com/spondanai/aigamesave/issues). We are actively looking for an adapter for **Cursor**.
+Check the [Issues tab](https://github.com/spondanai/aigamesave/issues). Coming-soon adapters make great first contributions — easiest first:
+
+| Adapter | Why easy |
+|---|---|
+| **Roo Code** | Near-identical to the existing Cline adapter — only the extension ID changes |
+| **Continue** | Plain JSON sessions, same pattern as Codex |
+| **Zed AI** | Markdown files, same pattern as Aider |
+| **Amazon Q Developer** | JSON format, straightforward path resolution |
+| **Windsurf** | SQLite (requires a pure-Go driver, e.g. `modernc.org/sqlite`) |
+| **Cursor** | SQLite + reverse-engineer `ItemTable` keys for chat/composer data |
 
 ---
 
