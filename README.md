@@ -14,7 +14,7 @@ AiGameSave (AGS) acts like a "save point" for your AI coding sessions. It extrac
 AI coding assistants are powerful, but starting a new session often means losing context—or spending dollars on input tokens just to re-read the workspace map. In agentic workflows this gets worse: the AI's own self-talk (running commands, checking logs, summarising results) can push your original instruction clean out of the context window.
 
 AGS solves this by:
-- **Zero Token Cost:** Uses 100% local Go logic (Git + file parsing). No API calls.
+- **Zero Token Cost:** Uses 100% local Go logic (Git + file parsing). No API calls. Benchmarks show **~99% token reduction** vs raw session files ([see BENCHMARK.md](BENCHMARK.md)).
 - **Instruction Anchoring:** Backward-searches for your last meaningful instruction so agentic self-talk can't evict it.
 - **Smart Truncation:** Automatically truncates massive code blocks and terminal outputs from the history.
 - **Auto-Redaction:** Sanitises common API keys before saving to prevent accidental leaks.
