@@ -40,7 +40,7 @@ func TestGetDiffCapsTrackedDiffWithoutReadingAllIntoResult(t *testing.T) {
 	dir := initGitRepo(t)
 
 	var b strings.Builder
-	for i := 0; i < 2000; i++ {
+	for range 2000 {
 		b.WriteString("changed line\n")
 	}
 	if err := os.WriteFile(filepath.Join(dir, "tracked.txt"), []byte(b.String()), 0644); err != nil {
@@ -86,6 +86,57 @@ func TestGetDiffSkipsLargeUntrackedFile(t *testing.T) {
 	}
 	if strings.Contains(diff, strings.Repeat("x", 128)) {
 		t.Fatalf("large untracked content should not be included")
+	}
+}
+
+func TestGetDiffExcludesNoisyTrackedFile(t *testing.T) {
+	dir := initGitRepo(t)
+
+	// Commit a go.sum so it's tracked.
+	goSum := filepath.Join(dir, "go.sum")
+	if err := os.WriteFile(goSum, []byte("h1:abc123\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	runGitForTest(t, dir, "add", "go.sum")
+	runGitForTest(t, dir, "commit", "-m", "add go.sum")
+
+	// Also modify the real source file.
+	if err := os.WriteFile(filepath.Join(dir, "tracked.txt"), []byte("changed\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	// Modify go.sum to create a noisy tracked diff.
+	if err := os.WriteFile(goSum, []byte("h1:abc123\nh1:xyz789\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	diff := GetDiff(dir, 4096)
+
+	if strings.Contains(diff, "go.sum") {
+		t.Errorf("go.sum should be excluded from diff, got:\n%s", diff)
+	}
+	if !strings.Contains(diff, "tracked.txt") {
+		t.Errorf("tracked.txt changes should be present in diff, got:\n%s", diff)
+	}
+}
+
+func TestGetDiffExcludesNoisyUntrackedFile(t *testing.T) {
+	dir := initGitRepo(t)
+
+	// Add a noisy untracked file alongside a legitimate one.
+	if err := os.WriteFile(filepath.Join(dir, "package-lock.json"), []byte(`{"lock":true}`), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "notes.txt"), []byte("important note\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	diff := GetDiff(dir, 4096)
+
+	if strings.Contains(diff, "package-lock.json") {
+		t.Errorf("package-lock.json should be excluded from untracked diff, got:\n%s", diff)
+	}
+	if !strings.Contains(diff, "important note") {
+		t.Errorf("notes.txt should appear in diff, got:\n%s", diff)
 	}
 }
 

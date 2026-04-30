@@ -74,6 +74,12 @@ type clineContentItem struct {
 //	"# Current Working Directory (/some/path) Files"
 var cwdPattern = regexp.MustCompile(`Current Working Directory \(([^)]+)\)`)
 
+// clineEnvDetailsRe matches the <environment_details> block that Cline injects
+// into every user turn. It contains file listings and system info that repeat
+// each turn and add no value to a session resume — stripping it saves a large
+// number of tokens without losing any conversation content.
+var clineEnvDetailsRe = regexp.MustCompile(`(?s)<environment_details>.*?</environment_details>\s*`)
+
 // extractClineCWD reads the first user message from the conversation file and
 // returns the working directory Cline was running in.
 func extractClineCWD(path string) string {
@@ -234,7 +240,11 @@ func (c *ClineAdapter) Extract(workingDir string) (domain.SessionState, error) {
 		if m.Role != "user" && m.Role != "assistant" {
 			continue
 		}
-		content := strings.TrimSpace(clineMessageText(m.Content))
+		text := clineMessageText(m.Content)
+		// Strip repetitive environment_details blocks injected by Cline into
+		// every user turn — they list workspace files and add no resume value.
+		text = clineEnvDetailsRe.ReplaceAllString(text, "")
+		content := strings.TrimSpace(text)
 		if content == "" {
 			continue
 		}

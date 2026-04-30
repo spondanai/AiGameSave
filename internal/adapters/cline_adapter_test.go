@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -152,6 +153,38 @@ func TestClineExtractTurns(t *testing.T) {
 	}
 	if turns[1].Role != "assistant" || turns[1].Content != "I'll look into it." {
 		t.Fatalf("unexpected turn[1]: %+v", turns[1])
+	}
+}
+
+func TestClineExtractStripsEnvironmentDetails(t *testing.T) {
+	tmpDir := t.TempDir()
+	tasksRoot := filepath.Join(tmpDir, "tasks")
+	_ = os.MkdirAll(tasksRoot, 0o755)
+
+	workDir := t.TempDir()
+	// Simulate a real Cline message: task text mixed with a large environment_details block.
+	userText := "<task>\nFix the bug\n</task>\n<environment_details>\n# Files\nfile1.go\nfile2.go\n...(hundreds of lines)...\n</environment_details>"
+	msgs := []map[string]any{
+		{"role": "user", "content": []map[string]any{{"type": "text", "text": userText}}},
+		{"role": "assistant", "content": []map[string]any{{"type": "text", "text": "On it."}}},
+	}
+	buildClineTask(t, tasksRoot, "1714000000001", workDir, msgs)
+
+	adapter := &ClineAdapter{cachedTask: filepath.Join(tasksRoot, "1714000000001", "api_conversation_history.json")}
+	state, err := adapter.Extract(workDir)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(state.RecentTurns) == 0 {
+		t.Fatal("expected at least one turn")
+	}
+	userContent := state.RecentTurns[0].Content
+	if strings.Contains(userContent, "<environment_details>") {
+		t.Errorf("environment_details block should be stripped, got: %q", userContent)
+	}
+	if !strings.Contains(userContent, "Fix the bug") {
+		t.Errorf("task content should be preserved, got: %q", userContent)
 	}
 }
 

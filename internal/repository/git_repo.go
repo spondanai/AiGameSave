@@ -47,9 +47,41 @@ func GetModifiedFiles(workingDir string) ([]domain.FileMetadata, error) {
 	return files, nil
 }
 
+// noisyDiffFiles are auto-generated or dependency-managed files whose diffs
+// never help an AI resume a session — they only consume the byte budget.
+var noisyDiffFiles = map[string]bool{
+	"go.sum":            true,
+	"package-lock.json": true,
+	"yarn.lock":         true,
+	"pnpm-lock.yaml":    true,
+	"Cargo.lock":        true,
+	"Gemfile.lock":      true,
+	"poetry.lock":       true,
+	"composer.lock":     true,
+	"Pipfile.lock":      true,
+}
+
+// isNoisyFile reports whether path should be excluded from the diff.
+func isNoisyFile(path string) bool {
+	base := filepath.Base(path)
+	return noisyDiffFiles[base] ||
+		strings.HasSuffix(base, ".min.js") ||
+		strings.HasSuffix(base, ".min.css")
+}
+
+// buildDiffExcludes returns :(exclude) pathspecs for all noisy file names.
+func buildDiffExcludes() []string {
+	out := make([]string, 0, len(noisyDiffFiles))
+	for name := range noisyDiffFiles {
+		out = append(out, ":(exclude)"+name)
+	}
+	return out
+}
+
 // GetDiff returns a combined diff: `git diff HEAD` for tracked changes plus
 // the content of untracked files (from `git ls-files --others --exclude-standard`).
-// Total output is truncated to maxBytes.
+// Auto-generated files (lock files, minified assets) are excluded so that the
+// byte budget is spent on meaningful changes. Total output is truncated to maxBytes.
 func GetDiff(workingDir string, maxBytes int) string {
 	if maxBytes <= 0 {
 		return ""
@@ -58,8 +90,10 @@ func GetDiff(workingDir string, maxBytes int) string {
 	var sb strings.Builder
 	truncated := false
 
-	// Tracked changes
-	if out, wasTruncated, err := runGitLimited(workingDir, maxBytes, "diff", "HEAD"); err == nil && len(out) > 0 {
+	// Tracked changes — exclude noisy files at the git level so they don't
+	// consume the byte budget before real source changes get a chance.
+	diffArgs := append([]string{"diff", "HEAD", "--"}, buildDiffExcludes()...)
+	if out, wasTruncated, err := runGitLimited(workingDir, maxBytes, diffArgs...); err == nil && len(out) > 0 {
 		sb.Write(out)
 		truncated = wasTruncated
 	}
@@ -73,6 +107,10 @@ func GetDiff(workingDir string, maxBytes int) string {
 				}
 				if sb.Len() >= maxBytes {
 					break
+				}
+
+				if isNoisyFile(rel) {
+					continue
 				}
 
 				fPath := filepath.Join(workingDir, rel)

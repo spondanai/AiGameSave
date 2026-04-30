@@ -2,7 +2,76 @@ package domain
 
 import (
 	"testing"
+	"time"
 )
+
+func TestRankFiles_MentionBonusWins(t *testing.T) {
+	now := time.Now()
+	files := []FileMetadata{
+		{Path: "old.go", ModTime: now.Add(-10 * time.Hour)},
+		{Path: "hot.go", ModTime: now.Add(-1 * time.Hour)},
+	}
+	turns := []Turn{
+		{Role: "user", Content: "please fix old.go"},
+	}
+	ranked := RankFiles(files, turns)
+	if ranked[0].Path != "old.go" {
+		t.Errorf("mentioned file should rank first, got %q", ranked[0].Path)
+	}
+}
+
+func TestRankFiles_MtimeBreaksTie(t *testing.T) {
+	now := time.Now()
+	files := []FileMetadata{
+		{Path: "a.go", ModTime: now.Add(-2 * time.Hour)},
+		{Path: "b.go", ModTime: now.Add(-1 * time.Hour)},
+	}
+	ranked := RankFiles(files, nil)
+	if ranked[0].Path != "b.go" {
+		t.Errorf("most recently modified file should rank first, got %q", ranked[0].Path)
+	}
+}
+
+func TestRankFiles_CapsAtMaxFiles(t *testing.T) {
+	now := time.Now()
+	files := make([]FileMetadata, maxFiles+5)
+	for i := range files {
+		files[i] = FileMetadata{Path: "file.go", ModTime: now}
+	}
+	ranked := RankFiles(files, nil)
+	if len(ranked) != maxFiles {
+		t.Errorf("expected %d files, got %d", maxFiles, len(ranked))
+	}
+}
+
+func TestRankFiles_EmptyInputReturnsEmpty(t *testing.T) {
+	if ranked := RankFiles(nil, nil); len(ranked) != 0 {
+		t.Errorf("expected empty result, got %v", ranked)
+	}
+}
+
+func TestRankFiles_SetsPriority(t *testing.T) {
+	files := []FileMetadata{{Path: "main.go", ModTime: time.Now()}}
+	ranked := RankFiles(files, nil)
+	if ranked[0].Priority == 0 {
+		t.Errorf("expected non-zero priority for most recent file")
+	}
+}
+
+func TestRankFiles_MentionBonusDoesNotStack(t *testing.T) {
+	now := time.Now()
+	files := []FileMetadata{{Path: "main.go", ModTime: now}}
+	turns := []Turn{
+		{Role: "user", Content: "fix main.go"},
+		{Role: "assistant", Content: "looking at main.go now"},
+	}
+	single := RankFiles([]FileMetadata{{Path: "main.go", ModTime: now}}, turns[:1])
+	multi := RankFiles(files, turns)
+	if single[0].Priority != multi[0].Priority {
+		t.Errorf("mention bonus should not stack: single=%d multi=%d",
+			single[0].Priority, multi[0].Priority)
+	}
+}
 
 func TestExtractFilePaths_BasicPaths(t *testing.T) {
 	turns := []Turn{
