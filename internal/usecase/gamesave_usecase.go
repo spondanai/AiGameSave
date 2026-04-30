@@ -119,6 +119,12 @@ func formatResumePrompt(state domain.SessionState) string {
 	for _, turn := range state.RecentTurns {
 		fmt.Fprintf(&sb, "[%s]: %s\n", turn.Role, turn.Content)
 	}
+	if len(state.PendingTasks) > 0 {
+		sb.WriteString("\n## Pending plan (tasks not yet completed)\n")
+		for _, t := range state.PendingTasks {
+			fmt.Fprintf(&sb, "- [ ] %s\n", t)
+		}
+	}
 	if len(state.ActiveFiles) > 0 {
 		sb.WriteString("\n## Active files (mentioned in conversation)\n")
 		for _, p := range state.ActiveFiles {
@@ -190,6 +196,13 @@ func LoadGame(workingDir string, toClipboard bool) (string, error) {
 	sb.WriteString("## Recent context\n")
 	for _, turn := range state.RecentTurns {
 		fmt.Fprintf(&sb, "[%s]: %s\n", turn.Role, turn.Content)
+	}
+
+	if len(state.PendingTasks) > 0 {
+		sb.WriteString("\n## Pending plan (tasks not yet completed)\n")
+		for _, t := range state.PendingTasks {
+			fmt.Fprintf(&sb, "- [ ] %s\n", t)
+		}
 	}
 
 	if len(state.ActiveFiles) > 0 {

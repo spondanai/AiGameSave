@@ -4,13 +4,16 @@ import "time"
 
 // SessionState represents the state extracted from a project for saving.
 type SessionState struct {
-	RecentTurns []Turn
-	ActiveFiles []string       `yaml:"activefiles,omitempty"`
-	GitVision   []FileMetadata
-	Diff        string         `yaml:",omitempty"`
+	RecentTurns  []Turn
+	ActiveFiles  []string       `yaml:"activefiles,omitempty"`
+	GitVision    []FileMetadata
+	Diff         string         `yaml:",omitempty"`
+	// PendingTasks holds todo items the AI had planned but not yet completed,
+	// captured from the last TodoWrite tool call in the session.
+	PendingTasks []string       `yaml:"pendingtasks,omitempty"`
 	// RawBytes is the byte size of the original session source file(s) before
 	// AGS processing. Used to report token savings. Not persisted to YAML.
-	RawBytes int64 `yaml:"-"`
+	RawBytes     int64          `yaml:"-"`
 }
 
 // Turn represents a single interaction in the history.

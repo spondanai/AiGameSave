@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Pending plan capture** — `ags save` now extracts the AI's last `TodoWrite` plan from Claude Code sessions and surfaces pending/in-progress tasks in the resume prompt under `## Pending plan`. Completed tasks are omitted. Only the most recent `TodoWrite` call is used so the plan always reflects the latest state.
 - **Cline adapter** — reads `api_conversation_history.json` from VS Code's `globalStorage/saoudrizwan.claude-dev/tasks/`. The most recent task whose embedded `Current Working Directory` matches the project (or any parent) is selected automatically. Cross-platform: macOS, Linux (`$XDG_CONFIG_HOME`), and Windows (`%APPDATA%`).
 
 ---
